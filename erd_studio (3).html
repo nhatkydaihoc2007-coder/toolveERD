@@ -1,0 +1,2285 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sơ đồ ERD & Lược đồ Quan hệ Studio Pro</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .bg-grid-pattern-light {
+            background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+            background-size: 20px 20px;
+        }
+        .bg-grid-pattern-dark {
+            background-image: radial-gradient(#334155 1.2px, transparent 1.2px);
+            background-size: 20px 20px;
+        }
+        
+        .selected-svg-shape {
+            filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8));
+        }
+
+        svg text {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+    
+        #main-svg { overflow: visible; }
+        #canvas-viewport { transform-origin: 0 0 !important; transition: none !important; }
+        .chip { padding: .3rem .6rem; font-size: 11px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: .5rem; cursor: pointer; transition: all .12s; }
+        .chip:hover { border-color: #3b82f6; }
+        .chip-on { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .dark .chip { border-color: #475569; }
+        .dark .chip-on { border-color: #2563eb; }
+        .btn-mini { padding: .3rem .6rem; font-size: 11px; font-weight: 600; border-radius: .5rem; background: #f1f5f9; }
+        .btn-mini:hover { background: #e2e8f0; }
+        .dark .btn-mini { background: #334155; }
+        .dark .btn-mini:hover { background: #475569; }
+    </style>
+</head>
+<body class="h-full bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col font-sans overflow-hidden select-none transition-colors duration-200">
+
+    <!-- TOP TOOLBAR NAVBAR -->
+    <header class="min-h-[3.5rem] py-1 gap-y-1 flex-wrap bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 flex items-center justify-between z-30 flex-shrink-0 shadow-sm">
+        
+        <!-- App Title & Logo -->
+        <div class="flex items-center space-x-3 flex-shrink-0 whitespace-nowrap">
+            <div class="bg-gradient-to-br from-blue-600 to-indigo-600 text-white p-2 rounded-xl shadow-md">
+                <i data-lucide="network" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm leading-tight text-slate-800 dark:text-white flex items-center gap-1.5">
+                    ERD & Relational Studio
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">v3.5 Type Switcher</span>
+                </h1>
+                <p class="hidden text-[10px] text-slate-500 dark:text-slate-400">Công cụ vẽ sơ đồ ERD & Lược đồ quan hệ chuyên nghiệp</p>
+            </div>
+        </div>
+
+        <!-- Mode Switcher Tabs -->
+        <div class="flex items-center bg-slate-100 dark:bg-slate-700/70 p-1 rounded-xl border border-slate-200 dark:border-slate-600">
+            <button id="btn-mode-erd" onclick="switchMode('erd')" class="px-3 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm">
+                <i data-lucide="shapes" class="w-3.5 h-3.5"></i>
+                <span>Sơ đồ ERD</span>
+            </button>
+            <button id="btn-mode-schema" onclick="switchMode('relational')" class="px-3 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">
+                <i data-lucide="table" class="w-3.5 h-3.5"></i>
+                <span>Lược đồ Quan hệ</span>
+            </button>
+        </div>
+
+        <!-- Action Tools & Presets -->
+        <div class="flex items-center flex-wrap gap-2 justify-end">
+            
+            <!-- Save controls -->
+            <div class="flex items-center gap-1.5">
+                <input id="proj-name" type="text" maxlength="60" placeholder="Tên bài..." oninput="onNameInput(this.value)" class="w-36 px-2.5 py-1.5 text-xs font-semibold border border-slate-200 dark:border-slate-600 dark:bg-slate-900 rounded-lg outline-none focus:border-blue-500 select-text">
+                <button onclick="saveProject()" title="Lưu bài (Ctrl+S)" class="px-2.5 py-1.5 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-lg flex items-center gap-1.5 transition">
+                    <i data-lucide="save" class="w-3.5 h-3.5"></i><span>Lưu</span>
+                </button>
+                <button onclick="openProjectsModal()" class="px-2.5 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg flex items-center gap-1.5 transition">
+                    <i data-lucide="folder-open" class="w-3.5 h-3.5 text-blue-500"></i><span class="hidden xl:inline">Bài đã lưu</span><span id="proj-count" class="font-bold text-blue-600"></span>
+                </button>
+                <span id="save-status" class="text-[10px] text-slate-400 w-14 leading-tight"></span>
+            </div>
+
+            <!-- Sample Templates Dropdown -->
+            <div class="relative dd">
+                <button class="px-2.5 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg flex items-center gap-1.5 transition">
+                    <i data-lucide="folder-open" class="w-3.5 h-3.5 text-amber-500"></i>
+                    <span class="hidden xl:inline">Sơ đồ mẫu</span>
+                    <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                </button>
+                <div class="absolute right-0 mt-1 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl dd-menu hidden z-50 p-1">
+                    <button onclick="loadTemplate('student')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <i data-lucide="graduation-cap" class="w-4 h-4 text-blue-500"></i>
+                        Quản lý Sinh viên - Học phần
+                    </button>
+                    <button onclick="loadTemplate('sales')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <i data-lucide="shopping-cart" class="w-4 h-4 text-emerald-500"></i>
+                        Quản lý Bán hàng & Đơn hàng
+                    </button>
+                    <button onclick="loadTemplate('eer')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <i data-lucide="git-fork" class="w-4 h-4 text-violet-500"></i>
+                        EER: Chuyên biệt hóa (Employee)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Global Theme Selector -->
+            <div class="relative dd">
+                <button class="px-2.5 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg flex items-center gap-1.5 transition">
+                    <i data-lucide="palette" class="w-3.5 h-3.5 text-indigo-500"></i>
+                    <span class="hidden xl:inline">Theme Màu</span>
+                    <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                </button>
+                <div class="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl dd-menu hidden z-50 p-1">
+                    <button onclick="applyGlobalTheme('default')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-blue-500 border"></span> Modern Blue
+                    </button>
+                    <button onclick="applyGlobalTheme('pastel')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-sky-300 border"></span> Soft Pastel
+                    </button>
+                    <button onclick="applyGlobalTheme('emerald')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-emerald-500 border"></span> Emerald Forest
+                    </button>
+                    <button onclick="applyGlobalTheme('sunset')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-orange-500 border"></span> Sunset Glow
+                    </button>
+                    <button onclick="applyGlobalTheme('dark')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-slate-800 border"></span> Dark Cyber
+                    </button>
+                    <button onclick="applyGlobalTheme('minimalist')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-zinc-900 border"></span> Minimalist Mono
+                    </button>
+                </div>
+            </div>
+
+            <!-- Auto Convert ERD -> Schema -->
+            <button onclick="autoConvertErdToRelational()" class="px-2.5 py-1.5 text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 rounded-lg flex items-center gap-1.5 transition">
+                <i data-lucide="wand-2" class="w-3.5 h-3.5 text-indigo-500"></i>
+                <span class="hidden xl:inline">Chuyển sang Schema</span>
+            </button>
+
+            <!-- SQL Generator -->
+            <button onclick="openSqlModal()" class="px-2.5 py-1.5 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center gap-1.5 transition">
+                <i data-lucide="code" class="w-3.5 h-3.5 text-emerald-500"></i>
+                <span class="hidden xl:inline">Tạo mã SQL</span>
+            </button>
+
+            <!-- Export Button -->
+            <button onclick="openExportModal()" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-lg flex items-center gap-1.5 shadow-md transition">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span class="hidden xl:inline">Xuất Sơ Đồ HD</span>
+            </button>
+
+            <!-- Light/Dark Mode Toggle -->
+            <button onclick="toggleTheme()" class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition">
+                <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+            </button>
+
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTENT (SIDEBAR + CANVAS + INSPECTOR) -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- LEFT SIDEBAR: SHAPES LIBRARY -->
+        <aside class="w-60 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col z-10 flex-shrink-0 shadow-sm">
+            <div class="p-3 border-b border-slate-200 dark:border-slate-700 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Thư viện phần tử</span>
+                <i data-lucide="box" class="w-3.5 h-3.5"></i>
+            </div>
+
+            <!-- ERD Toolbox -->
+            <div id="toolbox-erd" class="p-3 space-y-3 overflow-y-auto flex-1">
+                <div class="text-[11px] font-bold text-slate-400 uppercase">Thực thể (Entities)</div>
+                <button onclick="addNode('entity', 'strong')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-5 border-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-slate-800 rounded-sm flex items-center justify-center text-[9px] font-bold">E</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400">Thực thể thường</div>
+                        <div class="text-[9px] text-slate-400">Strong Entity</div>
+                    </div>
+                </button>
+
+                <button onclick="addNode('entity', 'weak')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-5 border-4 border-double border-blue-600 dark:border-blue-400 bg-white dark:bg-slate-800 rounded-sm flex items-center justify-center text-[9px] font-bold">WE</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400">Thực thể yếu</div>
+                        <div class="text-[9px] text-slate-400">Weak Entity</div>
+                    </div>
+                </button>
+
+                <button onclick="addNode('entity', 'associative')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-5 border-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-slate-800 rounded-sm flex items-center justify-center text-[9px] font-bold">AE</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400">Thực thể kết hợp</div>
+                        <div class="text-[9px] text-slate-400">Associative Entity</div>
+                    </div>
+                </button>
+
+                <div class="text-[11px] font-bold text-slate-400 uppercase mt-4">Thuộc tính (Attributes)</div>
+                <button onclick="addNode('attribute', 'pk')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-4 border-2 border-emerald-600 dark:border-emerald-400 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-[8px] font-bold underline">PK</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Khóa chính (PK)</div>
+                        <div class="text-[9px] text-slate-400">Primary Key</div>
+                    </div>
+                </button>
+
+                <button onclick="addNode('attribute', 'simple')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-4 border-2 border-emerald-600 dark:border-emerald-400 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-[8px]">A</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Thuộc tính thường</div>
+                        <div class="text-[9px] text-slate-400">Simple Attribute</div>
+                    </div>
+                </button>
+
+                <button onclick="addNode('attribute', 'fk')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-4 border-2 border-emerald-600 dark:border-emerald-400 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-[8px] italic">FK</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Khóa ngoại (FK)</div>
+                        <div class="text-[9px] text-slate-400">Foreign Key</div>
+                    </div>
+                </button>
+
+                <button onclick="addNode('attribute', 'partial_pk')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-4 border-2 border-emerald-600 dark:border-emerald-400 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-[8px] font-bold">PPK</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Khóa bán phần</div>
+                        <div class="text-[9px] text-slate-400">Partial Key (Gạch đứt)</div>
+                    </div>
+                </button>
+
+                <button onclick="addNode('attribute', 'multivalued')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-4 border-4 border-double border-emerald-600 dark:border-emerald-400 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-[8px]">MA</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Thuộc tính đa trị</div>
+                        <div class="text-[9px] text-slate-400">Multivalued (Ellipse kép)</div>
+                    </div>
+                </button>
+
+                <button onclick="addNode('attribute', 'derived')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-7 h-4 border-2 border-dashed border-emerald-600 dark:border-emerald-400 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-[8px]">DA</div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Thuộc tính dẫn xuất</div>
+                        <div class="text-[9px] text-slate-400">Derived (Nét đứt)</div>
+                    </div>
+                </button>
+
+                <div class="text-[11px] font-bold text-slate-400 uppercase mt-4">Mối quan hệ (Relationships)</div>
+                <button onclick="addNode('relationship', 'normal')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-amber-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-5 h-5 border-2 border-amber-600 dark:border-amber-400 bg-white dark:bg-slate-800 rotate-45 flex items-center justify-center">
+                        <span class="-rotate-45 text-[7px] font-bold">R</span>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-amber-600 dark:group-hover:text-amber-400">Mối quan hệ thường</div>
+                        <div class="text-[9px] text-slate-400">Normal Relationship</div>
+                    </div>
+                </button>
+
+                <button onclick="addNode('relationship', 'identifying')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-amber-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-5 h-5 border-4 border-double border-amber-600 dark:border-amber-400 bg-white dark:bg-slate-800 rotate-45 flex items-center justify-center">
+                        <span class="-rotate-45 text-[7px] font-bold">IR</span>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold group-hover:text-amber-600 dark:group-hover:text-amber-400">Mối quan hệ xác định</div>
+                        <div class="text-[9px] text-slate-400">Identifying Relationship</div>
+                    </div>
+                </button>
+
+                <div class="text-[11px] font-bold text-slate-400 uppercase mt-4">Chuyên biệt hóa (EER)</div>
+                <button onclick="addNode('specialization', 'disjoint')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-violet-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-5 h-5 border-2 border-violet-600 dark:border-violet-400 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-[9px] font-bold">d</div>
+                    <div><div class="text-xs font-semibold group-hover:text-violet-600">Rời nhau (d)</div><div class="text-[9px] text-slate-400">Disjoint specialization</div></div>
+                </button>
+                <button onclick="addNode('specialization', 'overlap')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-violet-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-5 h-5 border-2 border-violet-600 dark:border-violet-400 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-[9px] font-bold">o</div>
+                    <div><div class="text-xs font-semibold group-hover:text-violet-600">Giao nhau (o)</div><div class="text-[9px] text-slate-400">Overlapping</div></div>
+                </button>
+                <button onclick="addNode('specialization', 'union')" class="w-full p-2 bg-slate-50 dark:bg-slate-700/50 hover:bg-violet-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg flex items-center gap-2.5 transition text-left group">
+                    <div class="w-5 h-5 border-2 border-violet-600 dark:border-violet-400 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-[9px] font-bold">U</div>
+                    <div><div class="text-xs font-semibold group-hover:text-violet-600">Hội (U)</div><div class="text-[9px] text-slate-400">Union / Category</div></div>
+                </button>
+            </div>
+
+            <!-- Relational Schema Toolbox -->
+            <div id="toolbox-schema" class="p-3 space-y-3 overflow-y-auto flex-1 hidden">
+                <div class="text-[11px] font-bold text-slate-400 uppercase">Lược đồ Quan hệ (Tables)</div>
+                <button onclick="addNode('table', 'table')" class="w-full p-3 bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl flex items-center gap-3 transition text-left group">
+                    <div class="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center shadow-sm">
+                        <i data-lucide="table" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold group-hover:text-blue-600 dark:group-hover:text-blue-400">Thêm Bảng dữ liệu</div>
+                        <div class="text-[9px] text-slate-400">Table + Columns (PK/FK)</div>
+                    </div>
+                </button>
+
+                <div class="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 rounded-xl text-xs text-blue-800 dark:text-blue-300 space-y-1">
+                    <div class="font-bold flex items-center gap-1"><i data-lucide="info" class="w-3.5 h-3.5"></i> Hướng dẫn:</div>
+                    <p class="text-[10px] leading-relaxed">Nối dây từ bảng Cha (đầu 1, chứa PK) đến bảng Con (đầu N, chứa FK). Đầu 1 có vạch đôi, đầu N có chân chim.</p>
+                </div>
+            </div>
+
+            <!-- Clear Canvas Button -->
+            <div class="p-3 border-t border-slate-200 dark:border-slate-700">
+                <button onclick="clearCanvas()" class="w-full py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition border border-rose-200 dark:border-rose-900 flex items-center justify-center gap-1.5">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    <span>Xóa toàn bộ Canvas</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- CENTER CANVAS VIEWPORT AREA -->
+        <main class="flex-1 relative overflow-hidden bg-slate-50 dark:bg-slate-900 bg-grid-pattern-light dark:bg-grid-pattern-dark cursor-grab active:cursor-grabbing" id="canvas-container">
+            
+            <!-- Floating Canvas Toolbar -->
+            <div class="absolute top-3 left-3 z-20 flex items-center bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg p-1 gap-1">
+                <button id="tool-select" onclick="setToolMode('select')" class="p-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300" title="Chọn & Di chuyển (Phím V)">
+                    <i data-lucide="mouse-pointer" class="w-3.5 h-3.5"></i>
+                    <span>Chọn</span>
+                </button>
+                <button id="tool-connect" onclick="setToolMode('connect')" class="p-1.5 rounded-lg text-xs font-medium transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1" title="Nối dây liên kết (Phím C)">
+                    <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+                    <span>Nối dây</span>
+                </button>
+
+                <div class="w-px h-4 bg-slate-200 dark:bg-slate-700 my-auto mx-0.5"></div>
+
+                <button onclick="zoomCanvas(0.1)" class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Phóng to">
+                    <i data-lucide="zoom-in" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="zoomCanvas(-0.1)" class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Thu nhỏ">
+                    <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="resetZoom()" class="px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition font-mono" id="zoom-text">
+                    100%
+                </button>
+
+                <div class="w-px h-4 bg-slate-200 dark:bg-slate-700 my-auto mx-0.5"></div>
+
+                <button onclick="toggleGridSnap()" id="btn-grid-snap" class="p-1.5 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 rounded-lg transition" title="Căn chỉnh theo lưới Grid (Snap)">
+                    <i data-lucide="grid" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="undo()" class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Undo (Ctrl+Z)">
+                    <i data-lucide="undo" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="redo()" class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Redo (Ctrl+Y)">
+                    <i data-lucide="redo" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+
+            <!-- Connect Tool Hint Banner -->
+            <div id="connect-hint" class="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-amber-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg hidden flex items-center gap-2 animate-bounce">
+                <i data-lucide="link" class="w-3.5 h-3.5"></i>
+                <span>Nhấp chọn phần tử thứ nhất, sau đó chọn phần tử thứ hai để nối dây!</span>
+            </div>
+
+            <!-- Transform Viewport Space -->
+            <div id="canvas-viewport" class="absolute inset-0 origin-0 transition-transform duration-75">
+                
+                <!-- SVG Canvas Engine Rendering Layer -->
+                <svg id="main-svg" class="absolute inset-0 w-[6000px] h-[6000px] pointer-events-auto">
+                    <defs>
+                        <!-- Standard Arrowhead Marker -->
+                        <marker id="marker-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+                        </marker>
+                        <!-- Diamond Marker -->
+                        <marker id="marker-diamond" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                            <path d="M 0 6 L 6 0 L 12 6 L 6 12 z" fill="currentColor" />
+                        </marker>
+                        <!-- Crow's Foot / Fork Marker -->
+                        <marker id="marker-crow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                            <path d="M 0 0 L 12 6 L 0 12 M 12 6 L 0 6" stroke="currentColor" stroke-width="1.5" fill="none" />
+                        </marker>
+                        <marker id="marker-open" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><path d="M 7 0.8 L 19 6 L 7 11.2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></marker>
+                        <marker id="marker-tri_open" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><path d="M 6 1 L 19 6 L 6 11 z" fill="BG" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></marker>
+                        <marker id="marker-diamond_open" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><path d="M 4 6 L 12 1 L 20 6 L 12 11 z" fill="BG" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></marker>
+                        <marker id="marker-circle_open" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><circle cx="15" cy="6" r="4.5" fill="BG" stroke="currentColor" stroke-width="1.6"/></marker>
+                        <marker id="marker-bar" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><path d="M 15 1 L 15 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></marker>
+                        <marker id="marker-one" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><path d="M 11 1 L 11 11 M 15 1 L 15 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></marker>
+                        <marker id="marker-many" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><path d="M 6 6 L 20 1 M 6 6 L 20 11 M 6 6 L 20 6" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></marker>
+                        <marker id="marker-one_many" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><path d="M 8 6 L 20 1 M 8 6 L 20 11 M 8 6 L 20 6 M 5 1 L 5 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></marker>
+                        <marker id="marker-zero_one" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><circle cx="6" cy="6" r="4" fill="BG" stroke="currentColor" stroke-width="1.6"/><path d="M 15 1 L 15 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></marker>
+                        <marker id="marker-zero_many" viewBox="0 0 20 12" refX="20" refY="6" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="12" orient="auto-start-reverse"><circle cx="4.5" cy="6" r="3.5" fill="BG" stroke="currentColor" stroke-width="1.6"/><path d="M 9 6 L 20 1 M 9 6 L 20 11 M 9 6 L 20 6" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></marker>
+                        <!-- Circle Marker -->
+                        <marker id="marker-circle" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <circle cx="5" cy="5" r="4" fill="currentColor" />
+                        </marker>
+                    </defs>
+
+                    <!-- CONNECTIONS GROUP LAYER -->
+                    <g id="svg-connections-group"></g>
+
+                    <!-- NODES GROUP LAYER -->
+                    <g id="svg-nodes-group"></g>
+                </svg>
+
+            </div>
+
+            <!-- Floating Inline Text Editor Box -->
+            <input type="text" id="inline-editor" class="fixed hidden z-50 px-2 py-1 text-xs border-2 border-blue-500 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xl font-bold outline-none text-center" />
+
+        </main>
+
+        <!-- RIGHT SIDEBAR: INSPECTOR / PROPERTIES PANEL WITH TYPE SWITCHER -->
+        <aside id="properties-panel" class="w-80 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 flex flex-col z-10 flex-shrink-0 shadow-sm">
+            <div class="p-3 border-b border-slate-200 dark:border-slate-700 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Bảng Thuộc Tính & Loại Nút</span>
+                <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+            </div>
+
+            <div id="properties-content" class="p-4 space-y-4 overflow-y-auto flex-1">
+                <div class="text-center text-xs text-slate-400 py-10">
+                    <i data-lucide="mouse-pointer-click" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                    Nhấp chọn 1 phần tử hoặc đường nối để tùy chỉnh thông số và màu sắc.
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- EXPORT MODAL -->
+    <div id="export-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80">
+                <div class="flex items-center gap-2 font-bold text-sm text-slate-800 dark:text-white">
+                    <i data-lucide="image" class="w-4 h-4 text-blue-500"></i>
+                    <span>Tùy chọn Xuất Sơ đồ HD</span>
+                </div>
+                <button onclick="closeExportModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Độ phân giải Xuất PNG</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setExportScale(1)" id="scale-1" class="py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-center font-bold hover:border-blue-500">1x (Tiêu chuẩn)</button>
+                        <button onclick="setExportScale(2)" id="scale-2" class="py-2 border-2 border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 rounded-lg text-center font-bold">2x (HD 1080p)</button>
+                        <button onclick="setExportScale(3)" id="scale-3" class="py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-center font-bold hover:border-blue-500">3x (4K Ultra HD)</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Màu nền bức ảnh</label>
+                    <input type="hidden" id="export-bg-type" value="white">
+                    <div class="flex gap-2" id="export-bg-chips">
+                        <button type="button" data-bg="white" onclick="setExportBg('white')" class="chip chip-on flex-1">Trắng</button>
+                        <button type="button" data-bg="transparent" onclick="setExportBg('transparent')" class="chip flex-1">Trong suốt</button>
+                        <button type="button" data-bg="dark" onclick="setExportBg('dark')" class="chip flex-1">Nền tối</button>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex flex-col gap-2">
+                    <button onclick="executeExportPNG()" class="w-full py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>Tải ảnh PNG HD</span>
+                    </button>
+
+                    <button onclick="executeExportSVG()" class="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-bold shadow-md hover:bg-emerald-700 transition flex items-center justify-center gap-2">
+                        <i data-lucide="file-code" class="w-4 h-4"></i>
+                        <span>Tải File Vector SVG (Word/LaTeX)</span>
+                    </button>
+
+                    <div class="h-px bg-slate-200 dark:bg-slate-700 my-1"></div>
+
+                    <div class="flex gap-2">
+                        <button onclick="exportJSON()" class="flex-1 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-semibold hover:bg-slate-200 flex items-center justify-center gap-1">
+                            <i data-lucide="save" class="w-3.5 h-3.5"></i> Lưu Project (.json)
+                        </button>
+                        <button onclick="triggerImportJSON()" class="flex-1 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-semibold hover:bg-slate-200 flex items-center justify-center gap-1">
+                            <i data-lucide="upload" class="w-3.5 h-3.5"></i> Mở Project (.json)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SQL GENERATOR MODAL -->
+    <div id="sql-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh] border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80">
+                <div class="flex items-center gap-2 font-bold text-slate-800 dark:text-white">
+                    <i data-lucide="database" class="w-4 h-4 text-emerald-500"></i>
+                    <span>Mã SQL DDL (CREATE TABLE)</span>
+                </div>
+                <button onclick="closeSqlModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="p-4 flex-1 overflow-y-auto bg-slate-900 text-emerald-400 font-mono text-xs rounded-inner">
+                <pre id="sql-output" class="whitespace-pre-wrap leading-relaxed">-- Đang tạo script SQL...</pre>
+            </div>
+            <div class="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2 bg-slate-50 dark:bg-slate-800">
+                <button onclick="copySqlToClipboard()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-md">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    <span>Sao chép mã SQL</span>
+                </button>
+                <button onclick="closeSqlModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-300 transition">
+                    Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROJECTS MODAL -->
+    <div id="proj-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" onclick="if(event.target===this)closeProjectsModal()">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-lg w-full flex flex-col max-h-[80vh] border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80">
+                <div class="flex items-center gap-2 font-bold text-sm"><i data-lucide="folder-open" class="w-4 h-4 text-blue-500"></i><span>Bài đã lưu</span></div>
+                <button onclick="closeProjectsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div id="proj-list" class="p-3 overflow-y-auto flex-1 space-y-2"></div>
+            <div class="p-3 border-t border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 justify-between bg-slate-50 dark:bg-slate-800">
+                <button onclick="newProject()" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Bài mới</button>
+                <div class="flex gap-2">
+                    <button onclick="triggerImportJSON()" class="btn-mini">Nhập file .json</button>
+                    <button onclick="exportJSON()" class="btn-mini">Xuất file .json</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HIDDEN INPUT FOR JSON IMPORT -->
+    <input type="file" id="file-input" accept=".json" class="hidden" onchange="importJSON(event)" />
+
+    <!-- TOAST NOTIFICATIONS CONTAINER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- CORE JAVASCRIPT APPLICATION LOGIC -->
+    <script>
+        // GLOBAL APPLICATION STATE
+        const state = {
+            mode: 'erd', // 'erd' or 'relational'
+            toolMode: 'select', // 'select' or 'connect'
+            zoom: 1,
+            pan: { x: 0, y: 0 },
+            gridSnap: true,
+            gridSize: 10,
+            exportScale: 2, // 1x, 2x HD, 3x 4K
+            nodes: [],
+            connections: [],
+            selectedNodeId: null,
+            selectedConnectionId: null,
+            connectSourceNodeId: null,
+            history: [],
+            historyIndex: -1,
+            isDraggingCanvas: false,
+            dragStart: { x: 0, y: 0 },
+            activeNodeDrag: null,
+            nodeDragOffset: { x: 0, y: 0 }
+        };
+
+        // PRESET COLOR THEMES
+        const THEMES = {
+            default: { bg: '#f8fafc', stroke: '#2563eb', fill: '#ffffff', text: '#1e293b' },
+            pastel: { bg: '#fafafa', stroke: '#0284c7', fill: '#e0f2fe', text: '#0f172a' },
+            emerald: { bg: '#f0fdf4', stroke: '#059669', fill: '#d1fae5', text: '#064e3b' },
+            sunset: { bg: '#fff7ed', stroke: '#ea580c', fill: '#ffedd5', text: '#431407' },
+            dark: { bg: '#0f172a', stroke: '#38bdf8', fill: '#1e293b', text: '#f8fafc' },
+            minimalist: { bg: '#ffffff', stroke: '#18181b', fill: '#ffffff', text: '#09090b' }
+        };
+
+        // DOM ELEMENTS
+        const container = document.getElementById('canvas-container');
+        const viewport = document.getElementById('canvas-viewport');
+        const mainSvg = document.getElementById('main-svg');
+        const svgNodesGroup = document.getElementById('svg-nodes-group');
+        const svgConnectionsGroup = document.getElementById('svg-connections-group');
+        const propertiesPanel = document.getElementById('properties-content');
+        const inlineEditor = document.getElementById('inline-editor');
+
+        // INITIALIZATION
+        window.onload = function() {
+            lucide.createIcons();
+            setupEventListeners();
+            initProjects();
+            render();
+        };
+
+        function setupEventListeners() {
+            // Pan Canvas with Mouse Drag
+            container.addEventListener('mousedown', (e) => {
+                if (e.target === container || e.target === mainSvg || e.target.id === 'main-svg') {
+                    if (state.toolMode === 'select' || e.button === 1) {
+                        state.isDraggingCanvas = true;
+                        state.dragStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
+                    }
+                    deselectAll();
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (state.isDraggingCanvas) {
+                    state.pan.x = e.clientX - state.dragStart.x;
+                    state.pan.y = e.clientY - state.dragStart.y;
+                    updateViewportTransform();
+                } else if (state.activeNodeDrag) {
+                    const node = state.nodes.find(n => n.id === state.activeNodeDrag);
+                    if (node) {
+                        let nx = (e.clientX - state.pan.x - state.nodeDragOffset.x) / state.zoom;
+                        let ny = (e.clientY - state.pan.y - state.nodeDragOffset.y) / state.zoom;
+                        
+                        if (state.gridSnap) {
+                            nx = Math.round(nx / state.gridSize) * state.gridSize;
+                            ny = Math.round(ny / state.gridSize) * state.gridSize;
+                        }
+                        
+                        if (nx !== node.x || ny !== node.y) state.dragMoved = true;
+                        node.x = nx;
+                        node.y = ny;
+                        renderNodes();
+                        renderConnections();
+                    }
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (state.isDraggingCanvas) state.isDraggingCanvas = false;
+                if (state.activeNodeDrag) {
+                    state.activeNodeDrag = null;
+                    if (state.dragMoved) saveHistory();
+                    state.dragMoved = false;
+                }
+            });
+
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const r = container.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+                const old = state.zoom, nz = Math.min(2.5, Math.max(0.3, old * (e.deltaY > 0 ? 0.92 : 1.08)));
+                state.pan.x = mx - (mx - state.pan.x) * nz / old;
+                state.pan.y = my - (my - state.pan.y) * nz / old;
+                state.zoom = nz;
+                updateViewportTransform();
+            }, { passive: false });
+
+            window.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveProject(); return; }
+                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+                const k = e.key.toLowerCase();
+                if (e.ctrlKey || e.metaKey) {
+                    if (k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+                    else if (k === 'y') { e.preventDefault(); redo(); }
+                    return;
+                }
+                if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+                else if (k === 'v') setToolMode('select');
+                else if (k === 'c') setToolMode('connect');
+                else if (e.key === 'Escape') { setToolMode('select'); deselectAll(); }
+            });
+
+            inlineEditor.addEventListener('blur', saveInlineText);
+            inlineEditor.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') saveInlineText();
+            });
+        }
+
+        function setToolMode(mode) {
+            state.toolMode = mode;
+            state.connectSourceNodeId = null;
+            document.getElementById('tool-select').className = mode === 'select' 
+                ? 'p-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' 
+                : 'p-1.5 rounded-lg text-xs font-medium transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1';
+            
+            document.getElementById('tool-connect').className = mode === 'connect' 
+                ? 'p-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300' 
+                : 'p-1.5 rounded-lg text-xs font-medium transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1';
+
+            const hint = document.getElementById('connect-hint');
+            if (mode === 'connect') hint.classList.remove('hidden'); else hint.classList.add('hidden');
+        }
+
+        function zoomCanvas(delta) {
+            state.zoom = Math.min(Math.max(0.3, state.zoom + delta), 2.5);
+            updateViewportTransform();
+        }
+
+        function resetZoom() {
+            state.zoom = 1;
+            state.pan = { x: 0, y: 0 };
+            updateViewportTransform();
+        }
+
+        function toggleGridSnap() {
+            state.gridSnap = !state.gridSnap;
+            document.getElementById('btn-grid-snap').className = state.gridSnap 
+                ? 'p-1.5 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 rounded-lg transition'
+                : 'p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg transition';
+            showToast(state.gridSnap ? 'Đã bật căn chỉnh Grid Snap' : 'Đã tắt Grid Snap', 'info');
+        }
+
+        function updateViewportTransform() {
+            viewport.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
+            document.getElementById('zoom-text').innerText = `${Math.round(state.zoom * 100)}%`;
+        }
+
+        function switchMode(newMode) {
+            state.mode = newMode;
+            deselectAll();
+
+            const btnErd = document.getElementById('btn-mode-erd');
+            const btnSchema = document.getElementById('btn-mode-schema');
+            const toolboxErd = document.getElementById('toolbox-erd');
+            const toolboxSchema = document.getElementById('toolbox-schema');
+
+            if (newMode === 'erd') {
+                btnErd.className = 'px-3 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm';
+                btnSchema.className = 'px-3 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white';
+                toolboxErd.classList.remove('hidden');
+                toolboxSchema.classList.add('hidden');
+            } else {
+                btnSchema.className = 'px-3 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm';
+                btnErd.className = 'px-3 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white';
+                toolboxSchema.classList.remove('hidden');
+                toolboxErd.classList.add('hidden');
+            }
+            render();
+        }
+
+        // ADD NEW NODES (WITH MAIN TYPE AND SUB TYPE)
+        function addNode(mainType, subType) {
+            const x = Math.round((220 - state.pan.x) / state.zoom / 10) * 10;
+            const y = Math.round((160 - state.pan.y) / state.zoom / 10) * 10;
+
+            const id = 'node_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+            
+            let w = 120, h = 50;
+            if (mainType === 'attribute') { w = 110; h = 45; }
+            if (mainType === 'relationship') { w = 100; h = 70; }
+            if (mainType === 'table') { w = 200; h = 120; }
+            if (mainType === 'specialization') { w = 50; h = 50; }
+
+            let newNode = {
+                id,
+                mode: state.mode,
+                mainType, // 'entity', 'attribute', 'relationship', 'table'
+                subType,   // 'strong', 'weak', 'associative', 'simple', 'pk', 'fk', 'partial_pk', 'multivalued', 'derived', 'normal', 'identifying'
+                x: x + (state.nodes.length * 15 % 150),
+                y: y + (state.nodes.length * 15 % 150),
+                w, h,
+                label: getDefaultLabel(mainType, subType),
+                fillColor: '#ffffff',
+                borderColor: getDefaultBorderColor(mainType),
+                textColor: '#1e293b',
+                columns: mainType === 'table' ? [
+                    { id: 'c1', name: 'id', isPk: true, isFk: false, dataType: 'INT' },
+                    { id: 'c2', name: 'ten', isPk: false, isFk: false, dataType: 'VARCHAR(255)' }
+                ] : []
+            };
+
+            state.nodes.push(newNode);
+            selectNode(id);
+            saveHistory();
+            render();
+            showToast('Đã thêm phần tử mới', 'success');
+        }
+
+        function getDefaultLabel(mainType, subType) {
+            if (mainType === 'entity') return subType === 'weak' ? 'THỰC_THỂ_YẾU' : (subType === 'associative' ? 'THỰC_THỂ_KH' : 'THỰC_THỂ');
+            if (mainType === 'attribute') {
+                if (subType === 'pk') return 'Ma_So';
+                if (subType === 'fk') return 'Ma_Tham_Chieu';
+                if (subType === 'partial_pk') return 'Ma_Ban_Phan';
+                if (subType === 'multivalued') return 'So_Dien_Thoai';
+                if (subType === 'derived') return 'Tuoi_Duan';
+                return 'Thuoc_Tinh';
+            }
+            if (mainType === 'relationship') return subType === 'identifying' ? 'Xac_Dinh' : 'Moi_Quan_He';
+            if (mainType === 'specialization') return { disjoint: 'd', overlap: 'o', union: 'U' }[subType] || 'd';
+            if (mainType === 'table') return 'BANG_MOI';
+            return 'Phan_Tu';
+        }
+
+        function getDefaultBorderColor(mainType) {
+            if (mainType === 'entity') return '#2563eb';
+            if (mainType === 'attribute') return '#059669';
+            if (mainType === 'relationship') return '#d97706';
+            if (mainType === 'specialization') return '#7c3aed';
+            if (mainType === 'table') return '#2563eb';
+            return '#3b82f6';
+        }
+
+        // SELECTION MANAGEMENT
+        function deselectAll() {
+            state.selectedNodeId = null;
+            state.selectedConnectionId = null;
+            renderNodes();
+            renderConnections();
+            renderPropertiesPanel();
+        }
+
+        function selectNode(id) {
+            state.selectedNodeId = id;
+            state.selectedConnectionId = null;
+            renderNodes();
+            renderConnections();
+            renderPropertiesPanel();
+        }
+
+        function selectConnection(id) {
+            state.selectedConnectionId = id;
+            state.selectedNodeId = null;
+            renderNodes();
+            renderConnections();
+            renderPropertiesPanel();
+        }
+
+        // CONNECTIONS MANAGEMENT
+        function createConnection(sourceId, targetId) {
+            const exists = state.connections.some(c => 
+                (c.sourceId === sourceId && c.targetId === targetId) || 
+                (c.sourceId === targetId && c.targetId === sourceId)
+            );
+
+            if (exists) {
+                showToast('Hai phần tử này đã có đường liên kết!', 'warning');
+                return;
+            }
+
+            const newConn = {
+                id: 'conn_' + Date.now(),
+                mode: state.mode,
+                sourceId,
+                targetId,
+                routing: 'straight',
+                dashStyle: 'solid',
+                strokeColor: '#3b82f6',
+                strokeWidth: 2,
+                cardinality: '1',
+                markerStart: state.mode === 'relational' ? 'one' : 'none',
+                markerEnd: state.mode === 'relational' ? 'many' : 'none'
+            };
+
+            state.connections.push(newConn);
+            selectConnection(newConn.id);
+            saveHistory();
+            render();
+            showToast('Đã nối liên kết thành công!', 'success');
+        }
+
+        function getNodeCenter(node) {
+            return { x: node.x + node.w / 2, y: node.y + node.h / 2 };
+        }
+
+        function getBestAnchorPoints(sourceNode, targetNode) {
+            const sAnchors = [
+                { x: sourceNode.x + sourceNode.w/2, y: sourceNode.y },
+                { x: sourceNode.x + sourceNode.w, y: sourceNode.y + sourceNode.h/2 },
+                { x: sourceNode.x + sourceNode.w/2, y: sourceNode.y + sourceNode.h },
+                { x: sourceNode.x, y: sourceNode.y + sourceNode.h/2 }
+            ];
+
+            const tAnchors = [
+                { x: targetNode.x + targetNode.w/2, y: targetNode.y },
+                { x: targetNode.x + targetNode.w, y: targetNode.y + targetNode.h/2 },
+                { x: targetNode.x + targetNode.w/2, y: targetNode.y + targetNode.h },
+                { x: targetNode.x, y: targetNode.y + targetNode.h/2 }
+            ];
+
+            let minDist = Infinity;
+            let bestS = sAnchors[0], bestT = tAnchors[0];
+
+            sAnchors.forEach(sa => {
+                tAnchors.forEach(ta => {
+                    const dist = Math.hypot(ta.x - sa.x, ta.y - sa.y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestS = sa;
+                        bestT = ta;
+                    }
+                });
+            });
+
+            return { sAnchor: bestS, tAnchor: bestT };
+        }
+
+        // RENDER SVG CONNECTIONS
+        function renderConnections() {
+            svgConnectionsGroup.innerHTML = '';
+            mainSvg.querySelectorAll('defs [data-dyn]').forEach(m => m.remove());
+            const currentConnections = state.connections.filter(c => c.mode === state.mode);
+
+            currentConnections.forEach(conn => {
+                const sNode = state.nodes.find(n => n.id === conn.sourceId);
+                const tNode = state.nodes.find(n => n.id === conn.targetId);
+
+                if (!sNode || !tNode) return;
+
+                const { sAnchor, tAnchor, loop } = getConnAnchors(conn, sNode, tNode);
+                const isSelected = state.selectedConnectionId === conn.id;
+
+                const color = isSelected ? '#f59e0b' : (conn.strokeColor || '#3b82f6');
+                const width = isSelected ? (conn.strokeWidth + 2) : conn.strokeWidth;
+
+                let dashArray = 'none';
+                if (conn.dashStyle === 'dashed') dashArray = '6,4';
+                if (conn.dashStyle === 'dotted') dashArray = '2,4';
+                if (conn.dashStyle === 'dashdot') dashArray = '10,4,2,4';
+
+                let dPath = '';
+                if (conn.routing === 'bezier' && !loop) {
+                    const dx = tAnchor.x - sAnchor.x;
+                    const cx1 = sAnchor.x + dx / 2;
+                    const cy1 = sAnchor.y;
+                    const cx2 = sAnchor.x + dx / 2;
+                    const cy2 = tAnchor.y;
+                    dPath = `M ${sAnchor.x} ${sAnchor.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${tAnchor.x} ${tAnchor.y}`;
+                } else if (conn.routing === 'orthogonal_v' && !loop) {
+                    dPath = `M ${sAnchor.x} ${sAnchor.y} V ${(sAnchor.y + tAnchor.y) / 2} H ${tAnchor.x} V ${tAnchor.y}`;
+                } else if (conn.routing === 'orthogonal' || loop) {
+                    const midX = (sAnchor.x + tAnchor.x) / 2;
+                    dPath = loop ? `M ${sAnchor.x} ${sAnchor.y} H ${loop} V ${tAnchor.y} H ${tAnchor.x}` : `M ${sAnchor.x} ${sAnchor.y} H ${midX} V ${tAnchor.y} H ${tAnchor.x}`;
+                } else {
+                    dPath = `M ${sAnchor.x} ${sAnchor.y} L ${tAnchor.x} ${tAnchor.y}`;
+                }
+
+                const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('d', dPath);
+                pathEl.setAttribute('stroke', color);
+                pathEl.setAttribute('stroke-width', conn.lineKind === 'double' ? width * 3 : width);
+                if (conn.lineKind === 'double') pathEl.setAttribute('mask', 'url(#' + dblMask(conn.id, dPath, width) + ')');
+                pathEl.setAttribute('stroke-dasharray', dashArray);
+                pathEl.setAttribute('fill', 'none');
+
+                if (conn.markerEnd && conn.markerEnd !== 'none') {
+                    if (conn.lineKind !== 'double') pathEl.setAttribute('marker-end', 'url(#' + dynMarker(conn.markerEnd, color, conn.id) + ')');
+                }
+
+                if (conn.markerStart && conn.markerStart !== 'none' && conn.lineKind !== 'double') pathEl.setAttribute('marker-start', 'url(#' + dynMarker(conn.markerStart, color, conn.id + 's') + ')');
+
+                if (isSelected) {
+                    pathEl.setAttribute('class', 'selected-svg-shape');
+                }
+
+                svgConnectionsGroup.appendChild(pathEl);
+
+                // Hitbox Overlay
+                const clickOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                clickOverlay.setAttribute('d', dPath);
+                clickOverlay.setAttribute('stroke', 'transparent');
+                clickOverlay.setAttribute('stroke-width', '16');
+                clickOverlay.setAttribute('fill', 'none');
+                clickOverlay.style.cursor = 'pointer';
+                clickOverlay.onclick = (e) => { e.stopPropagation(); selectConnection(conn.id); };
+                svgConnectionsGroup.appendChild(clickOverlay);
+
+                // Points on the real drawn path (straight, curved or elbow)
+                const plen = pathEl.getTotalLength();
+                const ptAt = (L) => {
+                    const a = pathEl.getPointAtLength(Math.max(0, Math.min(plen, L))), b = pathEl.getPointAtLength(Math.max(0, Math.min(plen, L + 1)));
+                    const tl = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+                    return { x: a.x, y: a.y, tx: (b.x - a.x) / tl, ty: (b.y - a.y) / tl };
+                };
+                if (conn.subsetEnd === 'source' || conn.subsetEnd === 'target') {
+                    const atS = conn.subsetEnd === 'source', dd = Math.min(34, plen * 0.4);
+                    const p = ptAt(atS ? dd : plen - dd), sg = atS ? 1 : -1, ux = p.tx * sg, uy = p.ty * sg, nx = -uy, ny = ux, r = 10;
+                    const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    arc.setAttribute('d', `M ${p.x + nx * r} ${p.y + ny * r} A ${r} ${r} 0 0 0 ${p.x - nx * r} ${p.y - ny * r}`);
+                    arc.setAttribute('fill', 'none'); arc.setAttribute('stroke', color); arc.setAttribute('stroke-width', width);
+                    arc.setAttribute('stroke-linecap', 'round');
+                    svgConnectionsGroup.appendChild(arc);
+                }
+                if (conn.labelText) {
+                    const p = ptAt(plen / 2), nx = p.ty, ny = -p.tx;
+                    const lt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    lt.setAttribute('x', p.x + nx * 14); lt.setAttribute('y', p.y + ny * 14 + 4); lt.setAttribute('font-size', '12');
+                    lt.setAttribute('text-anchor', nx > 0.3 ? 'start' : (nx < -0.3 ? 'end' : 'middle'));
+                    lt.setAttribute('fill', document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b');
+                    lt.style.cursor = 'pointer'; lt.onclick = (e) => { e.stopPropagation(); selectConnection(conn.id); };
+                    lt.textContent = conn.labelText;
+                    svgConnectionsGroup.appendChild(lt);
+                }
+                // Cardinality Badge
+                if (conn.cardinality || conn.label) {
+                    const bp = ptAt(plen / 2), midX = bp.x, midY = bp.y;
+
+                    const gText = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    gText.style.cursor = 'pointer';
+                    gText.onclick = (e) => { e.stopPropagation(); selectConnection(conn.id); };
+
+                    const badgeRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    const bw = Math.max(32, String(conn.cardinality || conn.label).length * 6.5 + 14);
+                    badgeRect.setAttribute('x', midX - bw / 2);
+                    badgeRect.setAttribute('y', midY - 10);
+                    badgeRect.setAttribute('width', bw);
+                    badgeRect.setAttribute('height', '20');
+                    badgeRect.setAttribute('rx', '5');
+                    badgeRect.setAttribute('fill', document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff');
+                    badgeRect.setAttribute('stroke', color);
+                    badgeRect.setAttribute('stroke-width', '1.5');
+
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', midX);
+                    text.setAttribute('y', midY + 4);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('font-size', '10');
+                    text.setAttribute('font-weight', 'bold');
+                    text.setAttribute('fill', isSelected ? '#f59e0b' : color);
+                    text.textContent = conn.cardinality || conn.label;
+
+                    gText.appendChild(badgeRect);
+                    gText.appendChild(text);
+                    svgConnectionsGroup.appendChild(gText);
+                }
+            });
+        }
+
+        // RENDER NODES BY MAIN TYPE & SUB TYPE
+        function renderNodes() {
+            svgNodesGroup.innerHTML = '';
+            const currentNodes = state.nodes.filter(n => n.mode === state.mode);
+
+            currentNodes.forEach(node => {
+                const isSelected = state.selectedNodeId === node.id;
+                const gNode = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                gNode.id = node.id;
+                gNode.setAttribute('transform', `translate(${node.x}, ${node.y})`);
+                gNode.style.cursor = 'pointer';
+
+                gNode.onclick = (e) => {
+                    e.stopPropagation();
+                    if (state.toolMode === 'connect') {
+                        if (!state.connectSourceNodeId) {
+                            state.connectSourceNodeId = node.id;
+                            showToast('Đã chọn phần tử nguồn. Nhấp chọn phần tử thứ hai!', 'info');
+                        } else if (state.connectSourceNodeId !== node.id) {
+                            createConnection(state.connectSourceNodeId, node.id);
+                            state.connectSourceNodeId = null;
+                            setToolMode('select');
+                        }
+                    } else {
+                        selectNode(node.id);
+                    }
+                };
+
+                gNode.onmousedown = (e) => {
+                    if (state.toolMode === 'select' && e.button === 0) {
+                        state.activeNodeDrag = node.id;
+                        state.nodeDragOffset = {
+                            x: e.clientX - state.pan.x - (node.x * state.zoom),
+                            y: e.clientY - state.pan.y - (node.y * state.zoom)
+                        };
+                    }
+                };
+
+                gNode.ondblclick = (e) => {
+                    e.stopPropagation();
+                    openInlineTextEditor(node);
+                };
+
+                // Selection Highlight Box
+                if (isSelected) {
+                    const selBox = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    selBox.setAttribute('x', '-6');
+                    selBox.setAttribute('y', '-6');
+                    selBox.setAttribute('width', node.w + 12);
+                    selBox.setAttribute('height', node.h + 12);
+                    selBox.setAttribute('rx', '8');
+                    selBox.setAttribute('fill', 'none');
+                    selBox.setAttribute('stroke', '#f59e0b');
+                    selBox.setAttribute('stroke-width', '2');
+                    selBox.setAttribute('stroke-dasharray', '4,3');
+                    gNode.appendChild(selBox);
+                }
+
+                // 1. ENTITY MAIN TYPE
+                if (node.mainType === 'entity') {
+                    node.w = Math.max(120, node.label.length * 9);
+                    node.h = 50;
+
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('width', node.w);
+                    rect.setAttribute('height', node.h);
+                    rect.setAttribute('rx', '6');
+                    rect.setAttribute('fill', node.fillColor);
+                    rect.setAttribute('stroke', node.borderColor);
+                    rect.setAttribute('stroke-width', '2');
+                    gNode.appendChild(rect);
+
+                    if (node.subType === 'weak') {
+                        const inner = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        inner.setAttribute('x', '4');
+                        inner.setAttribute('y', '4');
+                        inner.setAttribute('width', node.w - 8);
+                        inner.setAttribute('height', node.h - 8);
+                        inner.setAttribute('rx', '4');
+                        inner.setAttribute('fill', 'none');
+                        inner.setAttribute('stroke', node.borderColor);
+                        inner.setAttribute('stroke-width', '1.5');
+                        gNode.appendChild(inner);
+                    } else if (node.subType === 'associative') {
+                        const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                        const hw = node.w / 2, hh = node.h / 2;
+                        diamond.setAttribute('points', `${hw},3 ${node.w-4},${hh} ${hw},${node.h-3} 4,${hh}`);
+                        diamond.setAttribute('fill', 'none');
+                        diamond.setAttribute('stroke', node.borderColor);
+                        diamond.setAttribute('stroke-width', '1.5');
+                        gNode.appendChild(diamond);
+                    }
+
+                    addSvgText(gNode, node.w/2, node.h/2 + 4, node.label, node.textColor, true);
+                } 
+                // 2. ATTRIBUTE MAIN TYPE
+                else if (node.mainType === 'attribute') {
+                    node.w = Math.max(110, node.label.length * 8.5);
+                    node.h = 44;
+                    const rx = node.w / 2, ry = node.h / 2;
+
+                    const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+                    ellipse.setAttribute('cx', rx);
+                    ellipse.setAttribute('cy', ry);
+                    ellipse.setAttribute('rx', rx - 2);
+                    ellipse.setAttribute('ry', ry - 2);
+                    ellipse.setAttribute('fill', node.fillColor);
+                    ellipse.setAttribute('stroke', node.borderColor);
+                    ellipse.setAttribute('stroke-width', '2');
+
+                    if (node.subType === 'derived') {
+                        ellipse.setAttribute('stroke-dasharray', '5,4');
+                    }
+
+                    gNode.appendChild(ellipse);
+
+                    if (node.subType === 'multivalued') {
+                        const innerE = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+                        innerE.setAttribute('cx', rx);
+                        innerE.setAttribute('cy', ry);
+                        innerE.setAttribute('rx', rx - 6);
+                        innerE.setAttribute('ry', ry - 6);
+                        innerE.setAttribute('fill', 'none');
+                        innerE.setAttribute('stroke', node.borderColor);
+                        innerE.setAttribute('stroke-width', '1.5');
+                        gNode.appendChild(innerE);
+                    }
+
+                    const isUnderline = (node.subType === 'pk');
+                    const isDashedUnderline = (node.subType === 'partial_pk');
+                    const isItalic = (node.subType === 'fk');
+
+                    addSvgText(gNode, rx, ry + 4, node.label, node.textColor, isUnderline, isUnderline, isDashedUnderline, isItalic);
+
+                    if (node.subType === 'fk') {
+                        const fkBadge = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        fkBadge.setAttribute('x', node.w - 12);
+                        fkBadge.setAttribute('y', 14);
+                        fkBadge.setAttribute('font-size', '8');
+                        fkBadge.setAttribute('font-weight', 'bold');
+                        fkBadge.setAttribute('fill', node.borderColor);
+                        fkBadge.textContent = 'FK';
+                        gNode.appendChild(fkBadge);
+                    }
+                } 
+                // 3. RELATIONSHIP MAIN TYPE
+                else if (node.mainType === 'relationship') {
+                    node.w = Math.max(100, node.label.length * 8);
+                    node.h = 70;
+                    const hw = node.w / 2, hh = node.h / 2;
+
+                    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    polygon.setAttribute('points', `${hw},0 ${node.w},${hh} ${hw},${node.h} 0,${hh}`);
+                    polygon.setAttribute('fill', node.fillColor);
+                    polygon.setAttribute('stroke', node.borderColor);
+                    polygon.setAttribute('stroke-width', '2');
+                    gNode.appendChild(polygon);
+
+                    if (node.subType === 'identifying') {
+                        const innerPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                        innerPoly.setAttribute('points', `${hw},5 ${node.w - 7},${hh} ${hw},${node.h - 5} 7,${hh}`);
+                        innerPoly.setAttribute('fill', 'none');
+                        innerPoly.setAttribute('stroke', node.borderColor);
+                        innerPoly.setAttribute('stroke-width', '1.5');
+                        gNode.appendChild(innerPoly);
+                    }
+
+                    addSvgText(gNode, hw, hh + 4, node.label, node.textColor, true);
+                } 
+                // SPECIALIZATION CIRCLE (EER)
+                else if (node.mainType === 'specialization') {
+                    node.w = 50; node.h = 50;
+                    const ci = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    ci.setAttribute('cx', 25); ci.setAttribute('cy', 25); ci.setAttribute('r', 23);
+                    ci.setAttribute('fill', node.fillColor); ci.setAttribute('stroke', node.borderColor); ci.setAttribute('stroke-width', '2');
+                    gNode.appendChild(ci);
+                    addSvgText(gNode, 25, 30, node.label, node.textColor, true);
+                }
+                // 4. RELATIONAL SCHEMA TABLE MAIN TYPE
+                else if (node.mainType === 'table') {
+                    node.w = 200;
+                    const rowHeight = 24;
+                    const headerHeight = 32;
+                    node.h = headerHeight + Math.max(1, node.columns.length) * rowHeight;
+
+                    const tableRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    tableRect.setAttribute('width', node.w);
+                    tableRect.setAttribute('height', node.h);
+                    tableRect.setAttribute('rx', '8');
+                    tableRect.setAttribute('fill', node.fillColor);
+                    tableRect.setAttribute('stroke', node.borderColor);
+                    tableRect.setAttribute('stroke-width', '2');
+                    gNode.appendChild(tableRect);
+
+                    const headerRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    headerRect.setAttribute('width', node.w);
+                    headerRect.setAttribute('height', headerHeight);
+                    headerRect.setAttribute('rx', '7');
+                    headerRect.setAttribute('fill', node.borderColor);
+                    gNode.appendChild(headerRect);
+
+                    addSvgText(gNode, node.w/2, 20, node.label.toUpperCase(), '#ffffff', true);
+
+                    node.columns.forEach((col, idx) => {
+                        const cy = headerHeight + idx * rowHeight + 16;
+                        if (idx > 0) {
+                            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                            line.setAttribute('x1', '0');
+                            line.setAttribute('y1', headerHeight + idx * rowHeight);
+                            line.setAttribute('x2', node.w);
+                            line.setAttribute('y2', headerHeight + idx * rowHeight);
+                            line.setAttribute('stroke', '#e2e8f0');
+                            line.setAttribute('stroke-width', '1');
+                            gNode.appendChild(line);
+                        }
+
+                        let prefix = '';
+                        if (col.isPk) prefix += '🔑 ';
+                        if (col.isFk) prefix += '🔗 ';
+
+                        const colText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        colText.setAttribute('x', '12');
+                        colText.setAttribute('y', cy);
+                        colText.setAttribute('font-size', '11');
+                        colText.setAttribute('font-weight', col.isPk ? 'bold' : 'normal');
+                        colText.setAttribute('fill', col.isPk ? '#2563eb' : (col.isFk ? '#059669' : '#334155'));
+                        colText.textContent = `${prefix}${col.name}`;
+                        gNode.appendChild(colText);
+
+                        const typeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        typeText.setAttribute('x', node.w - 12);
+                        typeText.setAttribute('y', cy);
+                        typeText.setAttribute('text-anchor', 'end');
+                        typeText.setAttribute('font-size', '10');
+                        typeText.setAttribute('fill', '#94a3b8');
+                        typeText.textContent = col.dataType || '';
+                        gNode.appendChild(typeText);
+                    });
+                }
+
+                svgNodesGroup.appendChild(gNode);
+            });
+        }
+
+        // SVG TEXT HELPER WITH UNDERLINE / DASHED UNDERLINE
+        function addSvgText(parentG, x, y, text, color, bold = false, underline = false, dashedUnderline = false, italic = false) {
+            const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            textEl.setAttribute('x', x);
+            textEl.setAttribute('y', y);
+            textEl.setAttribute('text-anchor', 'middle');
+            textEl.setAttribute('font-size', '12');
+            textEl.setAttribute('font-weight', bold ? 'bold' : 'normal');
+            if (italic) textEl.setAttribute('font-style', 'italic');
+            textEl.setAttribute('fill', color || '#1e293b');
+            
+            if (underline) textEl.setAttribute('text-decoration', 'underline');
+            textEl.textContent = text;
+            parentG.appendChild(textEl);
+
+            if (dashedUnderline) {
+                const textWidth = text.length * 7;
+                const dashLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                dashLine.setAttribute('x1', x - textWidth/2);
+                dashLine.setAttribute('y1', y + 3);
+                dashLine.setAttribute('x2', x + textWidth/2);
+                dashLine.setAttribute('y2', y + 3);
+                dashLine.setAttribute('stroke', color || '#1e293b');
+                dashLine.setAttribute('stroke-width', '1.5');
+                dashLine.setAttribute('stroke-dasharray', '3,2');
+                parentG.appendChild(dashLine);
+            }
+        }
+
+        // INSPECTOR PROPERTIES PANEL WITH TYPE & SUB-TYPE SWITCHER
+        function renderPropertiesPanel() {
+            if (state.selectedNodeId) {
+                const node = state.nodes.find(n => n.id === state.selectedNodeId);
+                if (!node) return;
+
+                if (node.mainType === 'table') {
+                    propertiesPanel.innerHTML = `
+                        <div class="space-y-4">
+                            <div class="p-2.5 bg-blue-50 dark:bg-blue-950/50 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center gap-2">
+                                <i data-lucide="table" class="w-4 h-4 text-blue-600"></i>
+                                <span class="font-bold text-xs text-blue-700 dark:text-blue-300">Bảng dữ liệu Relational Schema</span>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Tên Bảng / Quan hệ</label>
+                                <input type="text" value="${esc(node.label)}" oninput="updateNodeProperty('${node.id}', 'label', this.value)" class="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 dark:bg-slate-900 rounded-lg outline-none font-bold">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Màu viền (Header)</label>
+                                    <input type="color" value="${node.borderColor}" onchange="updateNodeProperty('${node.id}', 'borderColor', this.value)" class="w-full h-8 rounded border border-slate-200 dark:border-slate-700 cursor-pointer">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Màu nền Bảng</label>
+                                    <input type="color" value="${node.fillColor}" onchange="updateNodeProperty('${node.id}', 'fillColor', this.value)" class="w-full h-8 rounded border border-slate-200 dark:border-slate-700 cursor-pointer">
+                                </div>
+                            </div>
+
+                            <div class="border-t border-slate-200 dark:border-slate-700 pt-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="text-xs font-semibold text-slate-500">Danh sách Cột dữ liệu</label>
+                                    <button onclick="addTableColumn('${node.id}')" class="px-2 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded text-[11px] font-semibold hover:bg-blue-100 flex items-center gap-1">
+                                        <i data-lucide="plus" class="w-3 h-3"></i> Thêm Cột
+                                    </button>
+                                </div>
+
+                                <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                    ${node.columns.map((col, idx) => `
+                                        <div class="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 space-y-1.5">
+                                            <div class="flex items-center gap-1">
+                                                <input type="text" value="${esc(col.name)}" onchange="updateColumnField('${node.id}', ${idx}, 'name', this.value)" class="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded font-mono">
+                                                <button onclick="removeTableColumn('${node.id}', ${idx})" class="text-rose-500 hover:text-rose-700 p-1">
+                                                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                                </button>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-1 text-[11px]">
+                                                <label class="flex items-center gap-1 cursor-pointer">
+                                                    <input type="checkbox" ${col.isPk ? 'checked' : ''} onchange="toggleColumnFlag('${node.id}', ${idx}, 'isPk')" class="rounded border-slate-300">
+                                                    <span class="font-bold text-blue-600">PK</span>
+                                                </label>
+                                                <label class="flex items-center gap-1 cursor-pointer">
+                                                    <input type="checkbox" ${col.isFk ? 'checked' : ''} onchange="toggleColumnFlag('${node.id}', ${idx}, 'isFk')" class="rounded border-slate-300">
+                                                    <span class="font-bold text-emerald-600">FK</span>
+                                                </label>
+                                                <input type="text" value="${esc(col.dataType)}" placeholder="VARCHAR(255)" onchange="updateColumnField('${node.id}', ${idx}, 'dataType', this.value)" class="w-24 px-1 py-0.5 text-[10px] border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded font-mono">
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <button onclick="deleteSelected()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-lg text-xs font-semibold hover:bg-rose-100 transition flex items-center justify-center gap-1">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> Xóa Bảng này
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    // ERD NODES TYPE & SUB-TYPE SWITCHER
+                    propertiesPanel.innerHTML = `
+                        <div class="space-y-4">
+                            
+                            <!-- MAIN TYPE & SUB-TYPE SELECTOR PANEL -->
+                            <div class="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
+                                <div class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                                    <i data-lucide="repeat" class="w-4 h-4 text-blue-500"></i>
+                                    <span>Chuyển loại Phần tử (Type Switcher)</span>
+                                </div>
+
+                                <!-- 1. MAIN TYPE SWITCHER -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Loại chính (Main Type)</label>
+                                    ${chipGroup([['entity','Thực thể'],['attribute','Thuộc tính'],['relationship','Quan hệ'],['specialization','Chuyên biệt']], node.mainType, `changeNodeMainType('${node.id}',`)}
+                                </div>
+
+                                <!-- 2. SUB-TYPE SWITCHER DEPENDING ON MAIN TYPE -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Phân loại phụ (Sub-type)</label>
+                                    ${chipGroup(getSubTypeList(node.mainType), node.subType, `changeNodeSubType('${node.id}',`)}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Tên nhãn phần tử</label>
+                                <input type="text" value="${esc(node.label)}" oninput="updateNodeProperty('${node.id}', 'label', this.value)" class="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 dark:bg-slate-900 rounded-lg outline-none font-semibold">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Màu nền</label>
+                                    <input type="color" value="${node.fillColor}" onchange="updateNodeProperty('${node.id}', 'fillColor', this.value)" class="w-full h-8 rounded border border-slate-200 dark:border-slate-700 cursor-pointer">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Màu viền</label>
+                                    <input type="color" value="${node.borderColor}" onchange="updateNodeProperty('${node.id}', 'borderColor', this.value)" class="w-full h-8 rounded border border-slate-200 dark:border-slate-700 cursor-pointer">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Màu chữ</label>
+                                <input type="color" value="${node.textColor || '#1e293b'}" onchange="updateNodeProperty('${node.id}', 'textColor', this.value)" class="w-full h-8 rounded border border-slate-200 dark:border-slate-700 cursor-pointer">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Bảng màu nhanh</label>
+                                <div class="flex gap-1.5 flex-wrap">
+                                    ${['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0284c7', '#475569'].map(c => `
+                                        <button onclick="updateNodeProperty('${node.id}', 'borderColor', '${c}')" class="w-6 h-6 rounded-full border border-white shadow-sm" style="background-color: ${c}"></button>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <button onclick="deleteSelected()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-lg text-xs font-semibold hover:bg-rose-100 transition flex items-center justify-center gap-1">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> Xóa Phần tử
+                            </button>
+                        </div>
+                    `;
+                }
+            } else if (state.selectedConnectionId) {
+                const conn = state.connections.find(c => c.id === state.selectedConnectionId);
+                if (!conn) return;
+
+                propertiesPanel.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <i data-lucide="link" class="w-4 h-4"></i> Tùy chỉnh Đường Nối
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Kiểu đường nối (Routing)</label>
+                            ${chipGroup([['straight','Thẳng'],['bezier','Cong'],['orthogonal','Gấp khúc ngang'],['orthogonal_v','Gấp khúc dọc']], conn.routing || 'straight', `setConnProp('${conn.id}','routing',`)}
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Kiểu nét vẽ (Dash Style)</label>
+                            ${chipGroup([['solid','Liền'],['dashed','Đứt'],['dotted','Chấm'],['dashdot','Chấm gạch']], conn.dashStyle || 'solid', `setConnProp('${conn.id}','dashStyle',`)}
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Bản lượng / Nhãn (Cardinality)</label>
+                            <input type="text" value="${esc(conn.cardinality || '')}" placeholder="1, N, M, 0..1, 1..N, FK..." oninput="updateConnectionProperty('${conn.id}', 'cardinality', this.value)" class="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 dark:bg-slate-900 rounded-lg outline-none font-bold">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Nhãn chữ trên đường (vd: JobType, “Driver”)</label>
+                            <input type="text" value="${esc(conn.labelText || '')}" oninput="updateConnectionProperty('${conn.id}', 'labelText', this.value)" class="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 dark:bg-slate-900 rounded-lg outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Đầu bắt đầu (phía nút nguồn)</label>
+                            ${chipGroup(MARKERS, conn.markerStart || 'none', `setConnProp('${conn.id}','markerStart',`)}
+                        </div>
+                        ${conn.mode === 'erd' ? `<div>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Loại nét</label>
+                            ${chipGroup([['single','Đơn'],['double','Kép (tham gia toàn phần)']], conn.lineKind || 'single', `setConnProp('${conn.id}','lineKind',`)}
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Ký hiệu tập con ⊂ (đặt phía siêu lớp)</label>
+                            ${chipGroup([['none','Không'],['source','Gần đầu nguồn'],['target','Gần đầu đích']], conn.subsetEnd || 'none', `setConnProp('${conn.id}','subsetEnd',`)}
+                            <div class="text-[10px] text-slate-400 mt-1">Đầu nguồn = phần tử bạn bấm trước khi nối dây.</div>
+                        </div>` : ''}
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Màu đường nối</label>
+                                <input type="color" value="${conn.strokeColor || '#3b82f6'}" onchange="updateConnectionProperty('${conn.id}', 'strokeColor', this.value)" class="w-full h-8 rounded border border-slate-200 dark:border-slate-700 cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Đầu cuối (phía nút đích)</label>
+                                ${chipGroup(MARKERS, conn.markerEnd || 'none', `setConnProp('${conn.id}','markerEnd',`)}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Độ dày nét: ${conn.strokeWidth || 2}px</label>
+                            <input type="range" min="1" max="8" value="${conn.strokeWidth || 2}" onchange="updateConnectionProperty('${conn.id}', 'strokeWidth', parseInt(this.value))" class="w-full">
+                        </div>
+
+                        <button onclick="deleteSelected()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-lg text-xs font-semibold hover:bg-rose-100 transition flex items-center justify-center gap-1">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i> Xóa Đường Nối Này
+                        </button>
+                    </div>
+                `;
+            } else {
+                propertiesPanel.innerHTML = `
+                    <div class="text-center text-xs text-slate-400 py-10">
+                        <i data-lucide="mouse-pointer-click" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                        Nhấp chọn 1 phần tử hoặc đường nối để tùy chỉnh thuộc tính.
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        // GENERATE SUB-TYPES OPTIONS HTML
+        function getSubTypesOptionsHTML(mainType, currentSubType) {
+            if (mainType === 'entity') {
+                return `
+                    <option value="strong" ${currentSubType === 'strong' ? 'selected' : ''}>Thực thể thường (Strong Entity)</option>
+                    <option value="weak" ${currentSubType === 'weak' ? 'selected' : ''}>Thực thể yếu (Weak Entity)</option>
+                    <option value="associative" ${currentSubType === 'associative' ? 'selected' : ''}>Thực thể kết hợp (Associative)</option>
+                `;
+            } else if (mainType === 'attribute') {
+                return `
+                    <option value="simple" ${currentSubType === 'simple' ? 'selected' : ''}>Thuộc tính thường (Simple)</option>
+                    <option value="pk" ${currentSubType === 'pk' ? 'selected' : ''}>Khóa chính (Primary Key - PK)</option>
+                    <option value="fk" ${currentSubType === 'fk' ? 'selected' : ''}>Khóa ngoại (Foreign Key - FK)</option>
+                    <option value="partial_pk" ${currentSubType === 'partial_pk' ? 'selected' : ''}>Khóa bán phần (Partial Key)</option>
+                    <option value="multivalued" ${currentSubType === 'multivalued' ? 'selected' : ''}>Thuộc tính đa trị (Multivalued)</option>
+                    <option value="derived" ${currentSubType === 'derived' ? 'selected' : ''}>Thuộc tính dẫn xuất (Derived)</option>
+                `;
+            } else if (mainType === 'relationship') {
+                return `
+                    <option value="normal" ${currentSubType === 'normal' ? 'selected' : ''}>Mối quan hệ thường (Normal)</option>
+                    <option value="identifying" ${currentSubType === 'identifying' ? 'selected' : ''}>Mối quan hệ xác định (Identifying)</option>
+                `;
+            }
+            return '';
+        }
+
+        // TYPE SWITCHER LOGIC
+        function changeNodeMainType(nodeId, newMainType) {
+            const node = state.nodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            node.mainType = newMainType;
+            if (newMainType === 'entity') node.subType = 'strong';
+            if (newMainType === 'attribute') node.subType = 'simple';
+            if (newMainType === 'relationship') node.subType = 'normal';
+            if (newMainType === 'specialization') { node.subType = 'disjoint'; node.label = 'd'; }
+            else if (['d', 'o', 'U'].includes(node.label)) node.label = getDefaultLabel(newMainType, node.subType);
+
+            node.borderColor = getDefaultBorderColor(newMainType);
+            render();
+            renderPropertiesPanel();
+            saveHistory();
+            showToast('Đã chuyển đổi loại chính phần tử!', 'info');
+        }
+
+        function changeNodeSubType(nodeId, newSubType) {
+            const node = state.nodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            node.subType = newSubType;
+            if (node.mainType === 'specialization') node.label = getDefaultLabel('specialization', newSubType);
+            render();
+            renderPropertiesPanel();
+            saveHistory();
+            showToast('Đã chuyển đổi loại phụ phần tử!', 'info');
+        }
+
+        // PROPERTY UPDATERS
+        function updateNodeProperty(id, prop, val) {
+            const node = state.nodes.find(n => n.id === id);
+            if (node) {
+                node[prop] = val;
+                commitSoon();
+                renderNodes();
+                renderConnections();
+            }
+        }
+
+        function updateConnectionProperty(id, prop, val) {
+            const conn = state.connections.find(c => c.id === id);
+            if (conn) {
+                conn[prop] = val;
+                commitSoon();
+                renderConnections();
+            }
+        }
+
+        function addTableColumn(tableId) {
+            const node = state.nodes.find(n => n.id === tableId);
+            if (node) {
+                node.columns.push({
+                    id: 'col_' + Date.now(),
+                    name: 'column_' + (node.columns.length + 1),
+                    isPk: false,
+                    isFk: false,
+                    dataType: 'VARCHAR(255)'
+                });
+                renderNodes();
+                renderPropertiesPanel();
+                saveHistory();
+            }
+        }
+
+        function removeTableColumn(tableId, index) {
+            const node = state.nodes.find(n => n.id === tableId);
+            if (node) {
+                node.columns.splice(index, 1);
+                renderNodes();
+                renderPropertiesPanel();
+                saveHistory();
+            }
+        }
+
+        function updateColumnField(tableId, index, field, value) {
+            const node = state.nodes.find(n => n.id === tableId);
+            if (node && node.columns[index]) {
+                node.columns[index][field] = value;
+                commitSoon();
+                renderNodes();
+            }
+        }
+
+        function toggleColumnFlag(tableId, index, flag) {
+            const node = state.nodes.find(n => n.id === tableId);
+            if (node && node.columns[index]) {
+                node.columns[index][flag] = !node.columns[index][flag];
+                renderNodes();
+                saveHistory();
+            }
+        }
+
+        // INLINE EDITING
+        function openInlineTextEditor(node) {
+            const cr = container.getBoundingClientRect();
+            inlineEditor.style.left = (cr.left + state.pan.x + (node.x + node.w / 2) * state.zoom - 60) + 'px';
+            inlineEditor.style.top = (cr.top + state.pan.y + (node.y + node.h / 2) * state.zoom - 15) + 'px';
+            inlineEditor.style.width = '120px';
+            inlineEditor.value = node.label;
+            inlineEditor.dataset.nodeId = node.id;
+            inlineEditor.classList.remove('hidden');
+            inlineEditor.focus();
+            inlineEditor.select();
+        }
+
+        function saveInlineText() {
+            if (!inlineEditor.classList.contains('hidden') && inlineEditor.dataset.nodeId) {
+                const node = state.nodes.find(n => n.id === inlineEditor.dataset.nodeId);
+                if (node && inlineEditor.value.trim() !== '') {
+                    node.label = inlineEditor.value.trim();
+                    renderNodes();
+                    renderPropertiesPanel();
+                    saveHistory();
+                }
+                inlineEditor.classList.add('hidden');
+                inlineEditor.dataset.nodeId = '';
+            }
+        }
+
+        function deleteSelected() {
+            if (!state.selectedNodeId && !state.selectedConnectionId) return;
+            if (state.selectedNodeId) {
+                state.nodes = state.nodes.filter(n => n.id !== state.selectedNodeId);
+                state.connections = state.connections.filter(c => c.sourceId !== state.selectedNodeId && c.targetId !== state.selectedNodeId);
+                state.selectedNodeId = null;
+                showToast('Đã xóa phần tử!', 'info');
+            } else if (state.selectedConnectionId) {
+                state.connections = state.connections.filter(c => c.id !== state.selectedConnectionId);
+                state.selectedConnectionId = null;
+                showToast('Đã xóa đường nối!', 'info');
+            }
+            saveHistory();
+            render();
+        }
+
+        function clearCanvas() {
+            if (state.nodes.length === 0) return;
+            state.nodes = [];
+            state.connections = [];
+            deselectAll();
+            saveHistory();
+            render();
+            showToast('Đã xóa toàn bộ Canvas!', 'info');
+        }
+
+        function applyGlobalTheme(themeKey) {
+            const t = THEMES[themeKey] || THEMES.default;
+            state.nodes.forEach(n => {
+                n.fillColor = t.fill;
+                n.borderColor = t.stroke;
+                n.textColor = t.text;
+            });
+            state.connections.forEach(c => {
+                c.strokeColor = t.stroke;
+            });
+            render();
+            saveHistory();
+            showToast(`Đã áp dụng theme: ${themeKey}`, 'success');
+        }
+
+        // UNDO / REDO HISTORY
+        function saveHistory() {
+            const snapshot = JSON.stringify({ nodes: state.nodes, connections: state.connections });
+            if (state.historyIndex < state.history.length - 1) {
+                state.history = state.history.slice(0, state.historyIndex + 1);
+            }
+            state.history.push(snapshot);
+            state.historyIndex = state.history.length - 1;
+            if (typeof markDirty === "function") markDirty();
+        }
+
+        function undo() {
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                const data = JSON.parse(state.history[state.historyIndex]);
+                state.nodes = data.nodes;
+                state.connections = data.connections;
+                deselectAll();
+                render();
+                showToast('Undo hoành tác', 'info'); markDirty();
+            }
+        }
+
+        function redo() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.historyIndex++;
+                const data = JSON.parse(state.history[state.historyIndex]);
+                state.nodes = data.nodes;
+                state.connections = data.connections;
+                deselectAll();
+                render();
+                showToast('Redo khôi phục', 'info'); markDirty();
+            }
+        }
+
+        // AUTO CONVERT ERD TO RELATIONAL SCHEMA
+        function autoConvertErdToRelational() {
+            const N = state.nodes.filter(n => n.mode === 'erd'), C = state.connections.filter(c => c.mode === 'erd');
+            const ents = N.filter(n => n.mainType === 'entity');
+            if (!ents.length) { showToast('Không có thực thể ERD nào để chuyển đổi!', 'warning'); return; }
+            if (state.nodes.some(n => n.mode === 'relational') && !confirm('Lược đồ quan hệ hiện có sẽ bị thay thế. Tiếp tục?')) return;
+            const nb = id => C.filter(c => c.sourceId === id || c.targetId === id).map(c => ({ c, o: N.find(n => n.id === (c.sourceId === id ? c.targetId : c.sourceId)) })).filter(x => x.o);
+            const q = s => String(s).trim().replace(/\s+/g, '_'), uid = () => 'col_' + Math.random().toString(36).slice(2, 9);
+            const T = {}, out = []; let gid = 0;
+            const mk = (key, label) => { const t = { id: 'tbl_' + Date.now() + '_' + out.length, mode: 'relational', mainType: 'table', subType: 'table', x: 0, y: 0, w: 200, h: 120, label: q(label), fillColor: '#ffffff', borderColor: '#2563eb', textColor: '#1e293b', columns: [] }; out.push(t); T[key] = t; return t; };
+            const add = (t, name, type, pk, fk) => { if (!t.columns.some(c => c.name === name)) t.columns.push({ id: uid(), name, isPk: pk, isFk: fk, dataType: type }); };
+            const link = (t, parent, asPk, pref) => {
+                const g = ++gid, pt = T[parent.id];
+                pt.columns.filter(c => c.isPk).forEach(p => {
+                    const base = (t === pt ? (pref || 'cha') + '_' : '') + p.name; let nm = base, k = 2;
+                    while (t.columns.some(c => c.name === nm)) nm = base + '_' + k++;
+                    t.columns.push({ id: uid(), name: nm, isPk: asPk, isFk: true, dataType: p.dataType, ref: { tableId: pt.id, col: p.name, g } });
+                });
+            };
+            const isAttr = (x, ...skip) => x.o.mainType === 'attribute' && !skip.includes(x.o.subType);
+            // Specialization: superclass = end without the subset symbol (else the topmost entity)
+            const subOf = {};
+            N.filter(n => n.mainType === 'specialization' && n.subType !== 'union').forEach(sp => {
+                const es = nb(sp.id).filter(x => x.o.mainType === 'entity'); if (es.length < 2) return;
+                const cand = es.filter(x => x.c.subsetEnd !== 'source' && x.c.subsetEnd !== 'target'), pool = cand.length ? cand : es;
+                const sup = pool.reduce((a, b) => b.o.y < a.o.y ? b : a);
+                es.filter(x => x !== sup).forEach(x => { subOf[x.o.id] = sup.o; });
+            });
+            ents.forEach(e => mk(e.id, e.label));
+            ents.forEach(e => {
+                const t = T[e.id];
+                nb(e.id).filter(x => isAttr(x, 'derived', 'multivalued')).forEach(({ o }) => add(t, q(o.label), o.subType === 'pk' ? 'INT' : 'VARCHAR(255)', o.subType === 'pk' || o.subType === 'partial_pk', o.subType === 'fk'));
+                if (!t.columns.some(c => c.isPk) && e.subType !== 'weak' && !subOf[e.id]) add(t, 'id', 'INT', true, false);
+            });
+            Object.keys(subOf).forEach(id => link(T[id], subOf[id], true));   // subclass PK = FK -> superclass PK
+            ents.forEach(e => nb(e.id).filter(x => x.o.subType === 'multivalued' && x.o.mainType === 'attribute').forEach(({ o }) => {
+                const t = mk(o.id, e.label + '_' + o.label); link(t, e, true); add(t, q(o.label), 'VARCHAR(255)', true, false);
+            }));
+            N.filter(n => n.mainType === 'relationship').forEach(r => {
+                const ends = nb(r.id).filter(x => x.o.mainType === 'entity'), extra = nb(r.id).filter(x => isAttr(x, 'derived', 'multivalued'));
+                if (ends.length < 2) return;
+                const many = x => /[NM*]/i.test(x.c.cardinality || ''), addExtra = t => extra.forEach(({ o }) => add(t, q(o.label), 'VARCHAR(255)', false, false));
+                if (ends.length > 2 || ends.every(many)) {
+                    const t = mk(r.id, r.label); ends.forEach(x => link(t, x.o, true, r.label)); addExtra(t);
+                } else {
+                    const ch = ends.find(many) || ends.find(x => x.o.subType === 'weak') || ends[0], pa = ends.find(x => x !== ch);
+                    link(T[ch.o.id], pa.o, r.subType === 'identifying' && ch.o.subType === 'weak', r.label); addExtra(T[ch.o.id]);
+                }
+            });
+            // Layout: parents on top, child/junction tables below, centred between the tables they reference
+            const byId = Object.fromEntries(out.map(t => [t.id, t])), depth = {};
+            const refs = t => [...new Set(t.columns.filter(c => c.ref && c.ref.tableId !== t.id).map(c => c.ref.tableId))];
+            const dep = (t, seen) => depth[t.id] ?? (depth[t.id] = seen.includes(t.id) ? 0 : 1 + Math.max(-1, ...refs(t).map(r => dep(byId[r], [...seen, t.id]))));
+            const rows = []; out.forEach(t => (rows[dep(t, [])] = rows[dep(t, [])] || []).push(t));
+            let y = 80;
+            rows.forEach((row, d) => {
+                if (!row) return;
+                const gap = d === 0 ? 460 : 300;
+                row.forEach((t, i) => { const ps = refs(t).map(r => byId[r]); t._dx = (d && ps.length) ? ps.reduce((a, p) => a + p.x + 100, 0) / ps.length - 100 : 100 + i * gap; });
+                if (d) {
+                    const g = {}; row.forEach(t => (g[Math.round(t._dx)] = g[Math.round(t._dx)] || []).push(t));
+                    Object.values(g).forEach(a => a.forEach((t, i) => { t._dx += (i - (a.length - 1) / 2) * gap; }));
+                    row.sort((a, b) => a._dx - b._dx);
+                    row.forEach((t, i) => { if (i && t._dx < row[i - 1]._dx + gap) t._dx = row[i - 1]._dx + gap; });
+                    const mn = Math.min(...row.map(t => t._dx)); if (mn < 40) row.forEach(t => { t._dx += 40 - mn; });
+                }
+                row.forEach(t => { t.x = Math.round(t._dx / 10) * 10; t.y = y; delete t._dx; });
+                y += Math.max(...row.map(t => 32 + 24 * Math.max(1, t.columns.length))) + 90;
+            });
+            // One connection per foreign key: parent PK column (1) -> child FK column (N)
+            const conns = [], seen = new Set();
+            out.forEach(t => t.columns.filter(c => c.ref && !seen.has(c.ref.g)).forEach(c => {
+                seen.add(c.ref.g);
+                conns.push({ id: 'conn_' + Date.now() + '_' + conns.length, mode: 'relational', sourceId: c.ref.tableId, targetId: t.id, srcCol: c.ref.col, tgtCol: c.name, routing: 'orthogonal', dashStyle: 'solid', strokeColor: '#2563eb', strokeWidth: 2, cardinality: '', markerStart: 'one', markerEnd: 'many' });
+            }));
+            state.nodes = state.nodes.filter(n => n.mode !== 'relational').concat(out);
+            state.connections = state.connections.filter(c => c.mode !== 'relational').concat(conns);
+            switchMode('relational'); saveHistory();
+            showToast(`Đã tạo ${out.length} bảng và ${conns.length} liên kết khóa ngoại!`, 'success');
+        }
+
+        // EXPORT ENGINE (HD PNG & VECTOR SVG)
+        function openExportModal() {
+            document.getElementById('export-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeExportModal() {
+            document.getElementById('export-modal').classList.add('hidden');
+        }
+
+        function setExportScale(s) {
+            state.exportScale = s;
+            [1,2,3].forEach(i => {
+                const btn = document.getElementById(`scale-${i}`);
+                if (i === s) {
+                    btn.className = 'py-2 border-2 border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 rounded-lg text-center font-bold';
+                } else {
+                    btn.className = 'py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-center font-bold hover:border-blue-500';
+                }
+            });
+        }
+
+        function calculateDiagramBoundingBox(padding = 50) {
+            const currentNodes = state.nodes.filter(n => n.mode === state.mode);
+            if (currentNodes.length === 0) return { minX: 0, minY: 0, width: 800, height: 600 };
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+            currentNodes.forEach(n => {
+                minX = Math.min(minX, n.x);
+                minY = Math.min(minY, n.y);
+                maxX = Math.max(maxX, n.x + n.w);
+                maxY = Math.max(maxY, n.y + n.h);
+            });
+
+            minX -= padding;
+            minY -= padding;
+            maxX += padding;
+            maxY += padding;
+
+            return {
+                minX, minY,
+                width: Math.max(300, maxX - minX),
+                height: Math.max(300, maxY - minY)
+            };
+        }
+
+        function executeExportSVG() {
+            if (state.selectedNodeId || state.selectedConnectionId) deselectAll();
+            const bbox = calculateDiagramBoundingBox(40);
+            const cloneSvg = mainSvg.cloneNode(true);
+            cloneSvg.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+            
+            cloneSvg.setAttribute('viewBox', `${bbox.minX} ${bbox.minY} ${bbox.width} ${bbox.height}`);
+            cloneSvg.setAttribute('width', bbox.width);
+            cloneSvg.setAttribute('height', bbox.height);
+
+            const svgString = new XMLSerializer().serializeToString(cloneSvg);
+            const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sodo_${state.mode}_vector_${Date.now()}.svg`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            closeExportModal();
+            showToast('Đã tải File Vector SVG!', 'success');
+        }
+
+        function executeExportPNG() {
+            if (state.selectedNodeId || state.selectedConnectionId) deselectAll();
+            showToast('Đang kết xuất ảnh HD chất lượng cao...', 'info');
+
+            const bbox = calculateDiagramBoundingBox(40);
+            const scale = state.exportScale || 2;
+
+            const cloneSvg = mainSvg.cloneNode(true);
+            cloneSvg.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+            cloneSvg.setAttribute('viewBox', `${bbox.minX} ${bbox.minY} ${bbox.width} ${bbox.height}`);
+            cloneSvg.setAttribute('width', bbox.width * scale);
+            cloneSvg.setAttribute('height', bbox.height * scale);
+
+            const bgType = document.getElementById('export-bg-type').value;
+
+            const svgString = new XMLSerializer().serializeToString(cloneSvg);
+            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = bbox.width * scale;
+                canvas.height = bbox.height * scale;
+                const ctx = canvas.getContext('2d');
+
+                if (bgType === 'white') {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                } else if (bgType === 'dark') {
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = `sodo_${state.mode}_${scale}x_HD_${Date.now()}.png`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+
+                closeExportModal();
+                showToast(`Tải ảnh PNG (${scale}x HD) thành công!`, 'success');
+            };
+            img.src = url;
+        }
+
+        // SQL DDL SCRIPT GENERATOR
+        function openSqlModal() {
+            const schemaTables = state.nodes.filter(n => n.mode === 'relational' && n.mainType === 'table');
+            const sqlOutput = document.getElementById('sql-output');
+
+            if (schemaTables.length === 0) {
+                sqlOutput.innerText = '-- Chưa có Bảng nào trong Lược đồ Quan hệ.\n-- Bấm "Chuyển sang Schema" để tự động tạo DDL!';
+            } else {
+                let sqlStr = `-- SCRIPT DATABASE DDL (TỰ ĐỘNG PHÁT SINH)\n-- Ngày tạo: ${new Date().toLocaleDateString('vi-VN')}\n\n`;
+
+                const q = s => String(s).trim().replace(/\s+/g, '_'), byId = Object.fromEntries(schemaTables.map(t => [t.id, t])), alters = [];
+                schemaTables.forEach(tbl => {
+                    const defs = tbl.columns.map(c => `  ${q(c.name)} ${c.dataType || 'VARCHAR(255)'}${c.isPk ? ' NOT NULL' : ''}`);
+                    const pks = tbl.columns.filter(c => c.isPk).map(c => q(c.name));
+                    if (pks.length) defs.push(`  PRIMARY KEY (${pks.join(', ')})`);
+                    tbl.columns.filter(c => c.ref && byId[c.ref.tableId]).forEach(c => alters.push(`ALTER TABLE ${q(tbl.label).toUpperCase()} ADD FOREIGN KEY (${q(c.name)}) REFERENCES ${q(byId[c.ref.tableId].label).toUpperCase()}(${q(c.ref.col)});`));
+                    sqlStr += `CREATE TABLE ${q(tbl.label).toUpperCase()} (\n${defs.join(',\n')}\n);\n\n`;
+                });
+                if (alters.length) sqlStr += '-- KHÓA NGOẠI\n' + alters.join('\n') + '\n';
+                sqlOutput.innerText = sqlStr;
+            }
+
+            document.getElementById('sql-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeSqlModal() {
+            document.getElementById('sql-modal').classList.add('hidden');
+        }
+
+        function copySqlToClipboard() {
+            const sqlText = document.getElementById('sql-output').innerText;
+            const textarea = document.createElement('textarea');
+            textarea.value = sqlText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast('Đã sao chép mã SQL!', 'success');
+        }
+
+        // PRESET SAMPLES TEMPLATES
+        function loadTemplate(type, force) {
+            if (!force && proj.dirty && !confirm('Bài hiện tại chưa lưu. Mở sơ đồ mẫu sẽ thay thế nội dung — tiếp tục?')) return;
+            state.nodes = [];
+            state.connections = [];
+
+            if (type === 'student') {
+                state.nodes = [
+                    // ERD Mode
+                    { id: 'n1', mode: 'erd', mainType: 'entity', subType: 'strong', x: 200, y: 180, w: 120, h: 50, label: 'SINH_VIEN', fillColor: '#ffffff', borderColor: '#2563eb', textColor: '#1e293b' },
+                    { id: 'n2', mode: 'erd', mainType: 'attribute', subType: 'pk', x: 60, y: 120, w: 100, h: 44, label: 'MaSV', fillColor: '#ffffff', borderColor: '#059669', textColor: '#1e293b' },
+                    { id: 'n3', mode: 'erd', mainType: 'attribute', subType: 'simple', x: 60, y: 220, w: 100, h: 44, label: 'HoTen', fillColor: '#ffffff', borderColor: '#059669', textColor: '#1e293b' },
+                    { id: 'n4', mode: 'erd', mainType: 'relationship', subType: 'normal', x: 400, y: 180, w: 100, h: 70, label: 'Dang_Ky', fillColor: '#ffffff', borderColor: '#d97706', textColor: '#1e293b' },
+                    { id: 'n5', mode: 'erd', mainType: 'entity', subType: 'strong', x: 600, y: 180, w: 120, h: 50, label: 'HOC_PHAN', fillColor: '#ffffff', borderColor: '#2563eb', textColor: '#1e293b' },
+                    { id: 'n6', mode: 'erd', mainType: 'attribute', subType: 'pk', x: 750, y: 120, w: 100, h: 44, label: 'MaHP', fillColor: '#ffffff', borderColor: '#059669', textColor: '#1e293b' },
+                    { id: 'n7', mode: 'erd', mainType: 'attribute', subType: 'simple', x: 750, y: 220, w: 100, h: 44, label: 'TenHP', fillColor: '#ffffff', borderColor: '#059669', textColor: '#1e293b' },
+
+                    // Relational Schema Mode
+                    { id: 't1', mode: 'relational', mainType: 'table', subType: 'table', x: 150, y: 150, w: 200, h: 120, label: 'SINH_VIEN', fillColor: '#ffffff', borderColor: '#2563eb', columns: [
+                        { id: 'c1', name: 'MaSV', isPk: true, isFk: false, dataType: 'INT' },
+                        { id: 'c2', name: 'HoTen', isPk: false, isFk: false, dataType: 'VARCHAR(100)' },
+                        { id: 'c3', name: 'NgaySinh', isPk: false, isFk: false, dataType: 'DATE' }
+                    ]},
+                    { id: 't2', mode: 'relational', mainType: 'table', subType: 'table', x: 500, y: 150, w: 200, h: 120, label: 'HOC_PHAN', fillColor: '#ffffff', borderColor: '#2563eb', columns: [
+                        { id: 'c4', name: 'MaHP', isPk: true, isFk: false, dataType: 'VARCHAR(10)' },
+                        { id: 'c5', name: 'TenHP', isPk: false, isFk: false, dataType: 'VARCHAR(200)' },
+                        { id: 'c6', name: 'SoTinChi', isPk: false, isFk: false, dataType: 'INT' }
+                    ]}
+                ];
+
+                state.connections = [
+                    { id: 'c1', mode: 'erd', sourceId: 'n1', targetId: 'n2', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: '', markerEnd: 'none' },
+                    { id: 'c2', mode: 'erd', sourceId: 'n1', targetId: 'n3', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: '', markerEnd: 'none' },
+                    { id: 'c3', mode: 'erd', sourceId: 'n1', targetId: 'n4', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: 'N', markerEnd: 'none' },
+                    { id: 'c4', mode: 'erd', sourceId: 'n4', targetId: 'n5', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: 'M', markerEnd: 'none' },
+                    { id: 'c5', mode: 'erd', sourceId: 'n5', targetId: 'n6', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: '', markerEnd: 'none' },
+                    { id: 'c6', mode: 'erd', sourceId: 'n5', targetId: 'n7', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: '', markerEnd: 'none' },
+                    { id: 'c7', mode: 'relational', sourceId: 't1', targetId: 't2', routing: 'bezier', strokeColor: '#2563eb', strokeWidth: 2, cardinality: '1..N', markerEnd: 'arrow' }
+                ];
+            } else if (type === 'eer') {
+                const E = (id, x, y, l) => ({ id, mode: 'erd', mainType: 'entity', subType: 'strong', x, y, w: 120, h: 50, label: l, fillColor: '#ffffff', borderColor: '#2563eb', textColor: '#1e293b' });
+                const A = (id, x, y, l, st = 'simple') => ({ id, mode: 'erd', mainType: 'attribute', subType: st, x, y, w: 110, h: 44, label: l, fillColor: '#ffffff', borderColor: '#059669', textColor: '#1e293b' });
+                state.nodes = [E('e1', 380, 200, 'EMPLOYEE'), A('a1', 140, 120, 'ESSN', 'pk'), A('a2', 140, 220, 'EName'), A('a3', 640, 120, 'EBirthdate'), A('a4', 640, 220, 'ESalary'),
+                    { id: 'sp', mode: 'erd', mainType: 'specialization', subType: 'disjoint', x: 415, y: 340, w: 50, h: 50, label: 'd', fillColor: '#ffffff', borderColor: '#7c3aed', textColor: '#1e293b' },
+                    E('e2', 130, 480, 'SECRETARY'), E('e3', 380, 480, 'DRIVER'), E('e4', 630, 480, 'ENGINEER'),
+                    A('a5', 110, 600, 'TypingSpeed'), A('a6', 370, 600, 'VehicleType'), A('a7', 620, 600, 'EngType')];
+                const L = (id, a, b, o = {}) => ({ id, mode: 'erd', sourceId: a, targetId: b, routing: 'straight', dashStyle: 'solid', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: '', markerEnd: 'none', ...o });
+                state.connections = [L('l1', 'e1', 'a1'), L('l2', 'e1', 'a2'), L('l3', 'e1', 'a3'), L('l4', 'e1', 'a4'),
+                    L('l5', 'e1', 'sp', { labelText: 'JobType', lineKind: 'double' }),
+                    L('l6', 'sp', 'e2', { subsetEnd: 'source', labelText: '“Secretary”' }), L('l7', 'sp', 'e3', { subsetEnd: 'source', labelText: '“Driver”' }), L('l8', 'sp', 'e4', { subsetEnd: 'source', labelText: '“Engineer”' }),
+                    L('l9', 'e2', 'a5'), L('l10', 'e3', 'a6'), L('l11', 'e4', 'a7')];
+            } else if (type === 'sales') {
+                state.nodes = [
+                    { id: 's1', mode: 'erd', mainType: 'entity', subType: 'strong', x: 180, y: 180, w: 120, h: 50, label: 'KHACH_HANG', fillColor: '#ffffff', borderColor: '#2563eb' },
+                    { id: 's2', mode: 'erd', mainType: 'attribute', subType: 'pk', x: 50, y: 140, w: 100, h: 44, label: 'MaKH', fillColor: '#ffffff', borderColor: '#059669' },
+                    { id: 's3', mode: 'erd', mainType: 'relationship', subType: 'normal', x: 380, y: 180, w: 100, h: 70, label: 'Dat_Hang', fillColor: '#ffffff', borderColor: '#d97706' },
+                    { id: 's4', mode: 'erd', mainType: 'entity', subType: 'strong', x: 580, y: 180, w: 120, h: 50, label: 'DON_HANG', fillColor: '#ffffff', borderColor: '#2563eb' }
+                ];
+                state.connections = [
+                    { id: 'cs1', mode: 'erd', sourceId: 's1', targetId: 's2', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: '' },
+                    { id: 'cs2', mode: 'erd', sourceId: 's1', targetId: 's3', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: '1' },
+                    { id: 'cs3', mode: 'erd', sourceId: 's3', targetId: 's4', routing: 'straight', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: 'N' }
+                ];
+            }
+
+            state.history = []; state.historyIndex = -1; saveHistory();
+            proj.id = null; proj.name = ''; proj.dirty = false;
+            const pn = document.getElementById('proj-name'); if (pn) pn.value = '';
+            updateSaveUI(); render();
+            showToast('Đã tải sơ đồ mẫu!', 'success');
+        }
+
+        // SAVE & LOAD JSON PROJECT
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(snap(), null, 2));
+            const a = document.createElement('a');
+            a.href = dataStr;
+            a.download = `${(proj.name || 'erd_project').trim().replace(/\s+/g, '_')}.json`;
+            a.click();
+            showToast('Đã xuất file JSON dự án!', 'success');
+        }
+
+        function triggerImportJSON() {
+            document.getElementById('file-input').click();
+        }
+
+        function importJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    if (data.nodes && data.connections) {
+                        applySnap(data); proj.id = null; proj.name = (file.name || '').replace(/\.json$/i, ''); proj.dirty = true;
+                        document.getElementById('proj-name').value = proj.name; updateSaveUI(); autosave();
+                        closeExportModal(); closeProjectsModal();
+                        showToast('Đã mở dự án từ file JSON!', 'success');
+                    }
+                } catch(err) {
+                    showToast('Lỗi định dạng file JSON không hợp lệ!', 'rose');
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = "";
+        }
+
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            renderConnections();
+        }
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            let bg = 'bg-slate-800 text-white';
+            if (type === 'success') bg = 'bg-emerald-600 text-white';
+            if (type === 'warning') bg = 'bg-amber-500 text-white';
+            if (type === 'rose') bg = 'bg-rose-600 text-white';
+
+            toast.className = `${bg} px-4 py-2.5 rounded-xl shadow-2xl text-xs font-bold flex items-center gap-2 pointer-events-auto transition-all duration-300 transform translate-y-2 opacity-0`;
+            toast.innerHTML = `<i data-lucide="info" class="w-4 h-4"></i> <span>${msg}</span>`;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // ===== HELPERS =====
+        const MARKERS = [['none', 'Không'], ['arrow', '▶ Đặc'], ['open', '› Mở'], ['tri_open', '△ Rỗng'], ['diamond', '◆ Thoi'], ['diamond_open', '◇ Thoi rỗng'], ['circle', '● Tròn'], ['circle_open', '○ Tròn rỗng'], ['bar', '| Một'], ['one', '‖ Đúng một'], ['many', '⋔ Nhiều'], ['one_many', '|⋔ Một-nhiều'], ['zero_one', '○| 0..1'], ['zero_many', '○⋔ 0..N']];
+        function getConnAnchors(conn, s, t) {
+            if (s.mainType !== 'table' || t.mainType !== 'table' || !(conn.srcCol || conn.tgtCol)) return getBestAnchorPoints(s, t);
+            const rowY = (n, name) => { const i = (n.columns || []).findIndex(c => c.name === name); return i < 0 ? n.y + n.h / 2 : n.y + 32 + i * 24 + 12; };
+            const sy = rowY(s, conn.srcCol), ty = rowY(t, conn.tgtCol);
+            let sx, tx, loop = null;
+            if (s.x < t.x + t.w && t.x < s.x + s.w) { sx = s.x; tx = t.x; loop = Math.min(sx, tx) - 30; }
+            else if (s.x + s.w / 2 > t.x + t.w / 2) { sx = s.x; tx = t.x + t.w; }
+            else { sx = s.x + s.w; tx = t.x; }
+            return { sAnchor: { x: sx, y: sy }, tAnchor: { x: tx, y: ty }, loop };
+        }
+        function dblMask(id, d, w) {
+            const NS = 'http://www.w3.org/2000/svg', m = document.createElementNS(NS, 'mask');
+            m.id = 'dbm-' + id; m.setAttribute('data-dyn', '1'); m.setAttribute('maskUnits', 'userSpaceOnUse');
+            ['x', 'y'].forEach(a => m.setAttribute(a, 0)); m.setAttribute('width', 6000); m.setAttribute('height', 6000);
+            [['#fff', w * 3], ['#000', w]].forEach(([c, sw]) => {
+                const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); p.setAttribute('fill', 'none'); p.setAttribute('stroke', c); p.setAttribute('stroke-width', sw); m.appendChild(p);
+            });
+            mainSvg.querySelector('defs').appendChild(m);
+            return m.id;
+        }
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        function chipGroup(opts, cur, fn) {
+            return `<div class="flex flex-wrap gap-1.5">${opts.map(([v, l]) => `<button type="button" onclick="${fn}'${v}')" class="chip ${v === cur ? 'chip-on' : ''}">${l}</button>`).join('')}</div>`;
+        }
+        function getSubTypeList(m) {
+            return m === 'entity' ? [['strong', 'Thường'], ['weak', 'Yếu'], ['associative', 'Kết hợp']]
+                : m === 'attribute' ? [['simple', 'Thường'], ['pk', 'PK'], ['fk', 'FK'], ['partial_pk', 'Khóa bán phần'], ['multivalued', 'Đa trị'], ['derived', 'Dẫn xuất']]
+                : m === 'specialization' ? [['disjoint', 'Rời nhau (d)'], ['overlap', 'Giao nhau (o)'], ['union', 'Hội (U)']]
+                : [['normal', 'Thường'], ['identifying', 'Xác định']];
+        }
+        function setConnProp(id, prop, val) { updateConnectionProperty(id, prop, val); renderPropertiesPanel(); }
+        function setExportBg(v) {
+            document.getElementById('export-bg-type').value = v;
+            document.querySelectorAll('#export-bg-chips .chip').forEach(b => b.classList.toggle('chip-on', b.dataset.bg === v));
+        }
+        function dynMarker(type, color, id) {
+            const base = document.getElementById('marker-' + type);
+            if (!base) return 'marker-arrow';
+            const m = base.cloneNode(true); m.id = 'dm-' + id; m.setAttribute('data-dyn', '1');
+            m.querySelectorAll('*').forEach(el => { ['fill', 'stroke'].forEach(a => { if (el.getAttribute(a) === 'currentColor') el.setAttribute(a, color);
+                    if (el.getAttribute(a) === 'BG') el.setAttribute(a, document.documentElement.classList.contains('dark') ? '#0f172a' : '#f8fafc'); }); });
+            mainSvg.querySelector('defs').appendChild(m);
+            return m.id;
+        }
+        let _ct; function commitSoon() { clearTimeout(_ct); _ct = setTimeout(saveHistory, 600); }
+
+        // Click-to-open dropdowns (replace hover menus)
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.dd > button');
+            document.querySelectorAll('.dd-menu').forEach(m => { if (!btn || m !== btn.nextElementSibling) m.classList.add('hidden'); });
+            if (btn) btn.nextElementSibling.classList.toggle('hidden');
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.dd-menu').forEach(m => m.classList.add('hidden')); });
+
+        // ===== SAVED PROJECTS (localStorage, with in-memory fallback) =====
+        const LS = { list: 'erd_studio_projects_v1', draft: 'erd_studio_draft_v1' }, _mem = {};
+        const store = {
+            get(k) { try { return localStorage.getItem(k); } catch (e) { return _mem[k] ?? null; } },
+            set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { _mem[k] = v; return false; } }
+        };
+        const proj = { id: null, name: '', dirty: false };
+        const snap = () => JSON.parse(JSON.stringify({ nodes: state.nodes, connections: state.connections, mode: state.mode, pan: state.pan, zoom: state.zoom }));
+        const listProjects = () => { try { return JSON.parse(store.get(LS.list) || '[]'); } catch (e) { return []; } };
+        function applySnap(d) {
+            state.nodes = d.nodes || []; state.connections = d.connections || [];
+            state.pan = d.pan || { x: 0, y: 0 }; state.zoom = d.zoom || 1;
+            state.history = []; state.historyIndex = -1; saveHistory();
+            state.selectedNodeId = state.selectedConnectionId = null;
+            switchMode(d.mode || 'erd');
+        }
+        function updateSaveUI() {
+            const st = document.getElementById('save-status'), c = document.getElementById('proj-count');
+            if (st) st.textContent = proj.dirty ? 'Chưa lưu ●' : (proj.id ? 'Đã lưu ✓' : '');
+            if (c) { const n = listProjects().length; c.textContent = n ? n : ''; }
+        }
+        function autosave() { store.set(LS.draft, JSON.stringify({ id: proj.id, name: proj.name, dirty: proj.dirty, data: snap() })); }
+        let _at; function markDirty() { proj.dirty = true; updateSaveUI(); clearTimeout(_at); _at = setTimeout(autosave, 700); }
+        window.addEventListener('pagehide', autosave);
+        function onNameInput(v) { proj.name = v; markDirty(); }
+        function initProjects() {
+            let d = null; try { d = JSON.parse(store.get(LS.draft) || 'null'); } catch (e) { }
+            if (d && d.data && d.data.nodes && d.data.nodes.length) {
+                applySnap(d.data); proj.id = d.id; proj.name = d.name || ''; proj.dirty = !!d.dirty;
+                document.getElementById('proj-name').value = proj.name;
+            } else { saveHistory(); loadTemplate('student', true); }
+            updateSaveUI();
+        }
+        function saveProject() {
+            const name = (proj.name || '').trim() || 'Bài chưa đặt tên', L = listProjects(), now = Date.now();
+            let p = proj.id && L.find(x => x.id === proj.id);
+            if (p) { p.name = name; p.updatedAt = now; p.data = snap(); }
+            else { proj.id = 'p_' + now; L.push({ id: proj.id, name, updatedAt: now, data: snap() }); }
+            proj.name = name; proj.dirty = false;
+            document.getElementById('proj-name').value = name;
+            const ok = store.set(LS.list, JSON.stringify(L)); autosave(); updateSaveUI(); renderProjectList();
+            showToast(ok ? `Đã lưu "${name}"` : 'Trình duyệt chặn lưu trữ — bài chỉ giữ tạm, hãy dùng "Xuất file .json"', ok ? 'success' : 'warning');
+        }
+        function newProject() {
+            if (proj.dirty && !confirm('Bài hiện tại chưa lưu. Tạo bài mới và bỏ thay đổi?')) return;
+            applySnap({ nodes: [], connections: [], mode: 'erd' });
+            proj.id = null; proj.name = ''; proj.dirty = false;
+            document.getElementById('proj-name').value = ''; autosave(); updateSaveUI(); closeProjectsModal();
+            showToast('Đã tạo bài mới', 'info');
+        }
+        function openProject(id) {
+            const p = listProjects().find(x => x.id === id); if (!p) return;
+            if (proj.dirty && proj.id !== id && !confirm('Bài hiện tại chưa lưu. Mở bài khác và bỏ thay đổi?')) return;
+            applySnap(p.data); proj.id = p.id; proj.name = p.name; proj.dirty = false;
+            document.getElementById('proj-name').value = p.name; autosave(); updateSaveUI(); closeProjectsModal();
+            showToast(`Đã mở "${p.name}"`, 'success');
+        }
+        function dupProject(id) {
+            const L = listProjects(), p = L.find(x => x.id === id); if (!p) return;
+            L.push({ id: 'p_' + Date.now(), name: p.name + ' (bản sao)', updatedAt: Date.now(), data: p.data });
+            store.set(LS.list, JSON.stringify(L)); renderProjectList(); updateSaveUI();
+        }
+        function renameProject(id) {
+            const L = listProjects(), p = L.find(x => x.id === id); if (!p) return;
+            const n = prompt('Tên mới cho bài:', p.name); if (!n || !n.trim()) return;
+            p.name = n.trim().slice(0, 60); store.set(LS.list, JSON.stringify(L));
+            if (proj.id === id) { proj.name = p.name; document.getElementById('proj-name').value = p.name; }
+            renderProjectList();
+        }
+        function deleteProject(id) {
+            const L = listProjects(), p = L.find(x => x.id === id); if (!p || !confirm(`Xóa bài "${p.name}"? Không thể hoàn tác.`)) return;
+            store.set(LS.list, JSON.stringify(L.filter(x => x.id !== id)));
+            if (proj.id === id) { proj.id = null; proj.dirty = true; }
+            renderProjectList(); updateSaveUI();
+        }
+        function renderProjectList() {
+            const el = document.getElementById('proj-list'); if (!el) return;
+            const L = listProjects().sort((a, b) => b.updatedAt - a.updatedAt);
+            el.innerHTML = L.length ? L.map(p => `
+                <div class="p-3 rounded-xl border ${p.id === proj.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40' : 'border-slate-200 dark:border-slate-700'} flex items-center gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold truncate">${esc(p.name)}</div>
+                        <div class="text-[10px] text-slate-400">${p.data.nodes.filter(n => n.mode === 'erd').length} phần tử ERD · ${p.data.nodes.filter(n => n.mode === 'relational').length} bảng · ${new Date(p.updatedAt).toLocaleString('vi-VN')}</div>
+                    </div>
+                    <button class="btn-mini" onclick="openProject('${p.id}')">Mở</button>
+                    <button class="btn-mini" onclick="dupProject('${p.id}')">Nhân bản</button>
+                    <button class="btn-mini" onclick="renameProject('${p.id}')">Đổi tên</button>
+                    <button class="btn-mini text-rose-600" onclick="deleteProject('${p.id}')">Xóa</button>
+                </div>`).join('') : '<div class="text-center text-xs text-slate-400 py-10">Chưa có bài nào. Đặt tên bài rồi bấm "Lưu" (Ctrl+S).</div>';
+        }
+        function openProjectsModal() { renderProjectList(); document.getElementById('proj-modal').classList.remove('hidden'); lucide.createIcons(); }
+        function closeProjectsModal() { document.getElementById('proj-modal').classList.add('hidden'); }
+
+        function render() {
+            renderNodes();
+            renderConnections();
+            renderPropertiesPanel();
+            updateViewportTransform();
+        }
+    </script>
+</body>
+</html>
