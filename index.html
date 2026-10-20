@@ -333,6 +333,16 @@
                     </div>
                 </button>
 
+                <div class="text-[11px] font-bold text-slate-400 uppercase pt-2">Từ bảng có sẵn (kiểu Access)</div>
+                <button onclick="openTablesModal()" class="w-full p-3 bg-slate-50 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl flex items-center gap-3 transition text-left group">
+                    <div class="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-sm"><i data-lucide="clipboard-paste" class="w-4 h-4"></i></div>
+                    <div><div class="text-xs font-bold group-hover:text-emerald-600">Nhập bảng nhanh</div><div class="text-[9px] text-slate-400">Dán SQL hoặc TEN_BANG(*PK, cột)</div></div>
+                </button>
+                <button onclick="autoDetectRelations()" class="w-full p-3 bg-slate-50 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl flex items-center gap-3 transition text-left group">
+                    <div class="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-sm"><i data-lucide="wand-2" class="w-4 h-4"></i></div>
+                    <div><div class="text-xs font-bold group-hover:text-emerald-600">Tự nhận diện quan hệ</div><div class="text-[9px] text-slate-400">Dò khóa ngoại, nối 1–N tự động</div></div>
+                </button>
+
                 <div class="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 rounded-xl text-xs text-blue-800 dark:text-blue-300 space-y-1">
                     <div class="font-bold flex items-center gap-1"><i data-lucide="info" class="w-3.5 h-3.5"></i> Hướng dẫn:</div>
                     <p class="text-[10px] leading-relaxed">Nối dây từ bảng Cha (đầu 1, chứa PK) đến bảng Con (đầu N, chứa FK). Đầu 1 có vạch đôi, đầu N có chân chim.</p>
@@ -544,6 +554,25 @@
         </div>
     </div>
 
+    <!-- TABLES IMPORT MODAL -->
+    <div id="tbl-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" onclick="if(event.target===this)closeTablesModal()">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-xl w-full flex flex-col max-h-[85vh] border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80">
+                <div class="font-bold text-sm">Nhập bảng &amp; tự nhận diện quan hệ</div>
+                <button onclick="closeTablesModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="p-4 space-y-2 overflow-y-auto">
+                <p class="text-[11px] text-slate-500 leading-relaxed">Mỗi bảng một dòng: <code>TEN_BANG(*KhoaChinh, Cot2, Cot3)</code> (dấu <b>*</b> = khóa chính), hoặc dán nguyên các câu <code>CREATE TABLE</code>. Tool sẽ dò khóa ngoại (cột trùng tên với khóa chính bảng khác, hoặc <code>FOREIGN KEY</code> trong SQL), nối 1–N và xếp bố cục.</p>
+                <textarea id="tbl-text" rows="10" spellcheck="false" class="w-full p-3 text-xs font-mono border border-slate-200 dark:border-slate-700 dark:bg-slate-900 rounded-lg outline-none focus:border-blue-500 select-text"></textarea>
+                <button onclick="fillTablesExample()" class="text-[11px] text-blue-600 hover:underline">Điền ví dụ</button>
+            </div>
+            <div class="p-3 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2 bg-slate-50 dark:bg-slate-800">
+                <button onclick="closeTablesModal()" class="btn-mini">Hủy</button>
+                <button onclick="importTables()" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Tạo bảng &amp; nối quan hệ</button>
+            </div>
+        </div>
+    </div>
+
     <!-- PROJECTS MODAL -->
     <div id="proj-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" onclick="if(event.target===this)closeProjectsModal()">
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-lg w-full flex flex-col max-h-[80vh] border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -623,6 +652,7 @@
             // Pan Canvas with Mouse Drag
             container.addEventListener('mousedown', (e) => {
                 if (e.target === container || e.target === mainSvg || e.target.id === 'main-svg') {
+                    if (e.shiftKey && e.button === 0 && state.toolMode === 'select') { startMarquee(e); return; }
                     if (state.toolMode === 'select' || e.button === 1) {
                         state.isDraggingCanvas = true;
                         state.dragStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
@@ -632,6 +662,17 @@
             });
 
             window.addEventListener('mousemove', (e) => {
+                if (state.marquee) { updateMarquee(e); return; }
+                if (state.wpDrag) {
+                    const c = state.connections.find(x => x.id === state.wpDrag.id);
+                    if (c && c.points && c.points[state.wpDrag.idx]) {
+                        const r = container.getBoundingClientRect();
+                        let x = (e.clientX - r.left - state.pan.x) / state.zoom, y = (e.clientY - r.top - state.pan.y) / state.zoom;
+                        if (state.gridSnap) { x = Math.round(x / state.gridSize) * state.gridSize; y = Math.round(y / state.gridSize) * state.gridSize; }
+                        c.points[state.wpDrag.idx] = { x, y }; state.wpDrag.moved = true; renderConnections();
+                    }
+                    return;
+                }
                 if (state.isDraggingCanvas) {
                     state.pan.x = e.clientX - state.dragStart.x;
                     state.pan.y = e.clientY - state.dragStart.y;
@@ -650,6 +691,11 @@
                         if (nx !== node.x || ny !== node.y) state.dragMoved = true;
                         node.x = nx;
                         node.y = ny;
+                        if (state.dragGroup && state.dragGroup[node.id]) {
+                            const b = state.dragGroup[node.id], dx = node.x - b.x, dy = node.y - b.y;
+                            state.nodes.forEach(n => { const o = state.dragGroup[n.id]; if (o && n !== node) { n.x = o.x + dx; n.y = o.y + dy; } });
+                            (state.dragGroupConns || []).forEach(g => { g.c.points = g.pts.map(p => ({ x: p.x + dx, y: p.y + dy })); });
+                        }
                         renderNodes();
                         renderConnections();
                     }
@@ -657,10 +703,13 @@
             });
 
             window.addEventListener('mouseup', () => {
+                if (state.marquee) { endMarquee(); return; }
+                if (state.wpDrag) { if (state.wpDrag.moved) saveHistory(); state.wpDrag = null; return; }
                 if (state.isDraggingCanvas) state.isDraggingCanvas = false;
                 if (state.activeNodeDrag) {
                     state.activeNodeDrag = null;
-                    if (state.dragMoved) saveHistory();
+                    if (state.dragMoved) { saveHistory(); state.justDragged = true; setTimeout(() => { state.justDragged = false; }, 60); }
+                    state.dragGroup = null; state.dragGroupConns = null;
                     state.dragMoved = false;
                 }
             });
@@ -682,6 +731,8 @@
                 if (e.ctrlKey || e.metaKey) {
                     if (k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
                     else if (k === 'y') { e.preventDefault(); redo(); }
+                    else if (k === 'a') { e.preventDefault(); selectAllNodes(); }
+                    else if (k === 'd') { e.preventDefault(); duplicateSelection(); }
                     return;
                 }
                 if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
@@ -823,6 +874,7 @@
 
         // SELECTION MANAGEMENT
         function deselectAll() {
+            state.multi.clear();
             state.selectedNodeId = null;
             state.selectedConnectionId = null;
             renderNodes();
@@ -830,7 +882,9 @@
             renderPropertiesPanel();
         }
 
-        function selectNode(id) {
+        function selectNode(id, additive) {
+            if (additive) { toggleMulti(id); return; }
+            state.multi.clear();
             state.selectedNodeId = id;
             state.selectedConnectionId = null;
             renderNodes();
@@ -839,6 +893,7 @@
         }
 
         function selectConnection(id) {
+            state.multi.clear();
             state.selectedConnectionId = id;
             state.selectedNodeId = null;
             renderNodes();
@@ -955,6 +1010,7 @@
                     dPath = `M ${sAnchor.x} ${sAnchor.y} L ${tAnchor.x} ${tAnchor.y}`;
                 }
 
+                if (conn.points && conn.points.length) dPath = buildWaypointPath(conn, sAnchor, tAnchor);
                 const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 pathEl.setAttribute('d', dPath);
                 pathEl.setAttribute('stroke', color);
@@ -1043,6 +1099,27 @@
                     gText.appendChild(text);
                     svgConnectionsGroup.appendChild(gText);
                 }
+            
+                // Waypoint handles (selected connection only)
+                if (isSelected) {
+                    const NS = 'http://www.w3.org/2000/svg', wp = conn.points || [], pts = [sAnchor, ...wp, tAnchor];
+                    const dot = (x, y, r, fill, cursor) => {
+                        const c = document.createElementNS(NS, 'circle');
+                        c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', r); c.setAttribute('fill', fill);
+                        c.setAttribute('stroke', '#f59e0b'); c.setAttribute('stroke-width', 2); c.style.cursor = cursor;
+                        svgConnectionsGroup.appendChild(c); return c;
+                    };
+                    for (let i = 0; i < pts.length - 1; i++) {
+                        const mp = wp.length ? { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 } : ptAt(plen / 2);
+                        const h = dot(mp.x, mp.y, 5, 'rgba(255,255,255,.9)', 'copy');
+                        h.onmousedown = (e) => { e.stopPropagation(); e.preventDefault(); insertWaypoint(conn.id, i, mp.x, mp.y); };
+                    }
+                    wp.forEach((p, i) => {
+                        const h = dot(p.x, p.y, 6.5, '#f59e0b', 'move');
+                        h.onmousedown = (e) => { e.stopPropagation(); e.preventDefault(); state.wpDrag = { id: conn.id, idx: i, moved: false }; };
+                        h.ondblclick = (e) => { e.stopPropagation(); conn.points.splice(i, 1); saveHistory(); renderConnections(); renderPropertiesPanel(); };
+                    });
+                }
             });
         }
 
@@ -1052,13 +1129,14 @@
             const currentNodes = state.nodes.filter(n => n.mode === state.mode);
 
             currentNodes.forEach(node => {
-                const isSelected = state.selectedNodeId === node.id;
+                const isSelected = state.selectedNodeId === node.id || state.multi.has(node.id);
                 const gNode = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 gNode.id = node.id;
                 gNode.setAttribute('transform', `translate(${node.x}, ${node.y})`);
                 gNode.style.cursor = 'pointer';
 
                 gNode.onclick = (e) => {
+                    if (state.justDragged) { e.stopPropagation(); return; }
                     e.stopPropagation();
                     if (state.toolMode === 'connect') {
                         if (!state.connectSourceNodeId) {
@@ -1070,13 +1148,14 @@
                             setToolMode('select');
                         }
                     } else {
-                        selectNode(node.id);
+                        selectNode(node.id, e.shiftKey || e.ctrlKey || e.metaKey);
                     }
                 };
 
                 gNode.onmousedown = (e) => {
                     if (state.toolMode === 'select' && e.button === 0) {
                         state.activeNodeDrag = node.id;
+                        startGroupDrag(node.id);
                         state.nodeDragOffset = {
                             x: e.clientX - state.pan.x - (node.x * state.zoom),
                             y: e.clientY - state.pan.y - (node.y * state.zoom)
@@ -1321,6 +1400,7 @@
 
         // INSPECTOR PROPERTIES PANEL WITH TYPE & SUB-TYPE SWITCHER
         function renderPropertiesPanel() {
+            if (state.multi.size > 1) { renderMultiPanel(); lucide.createIcons(); return; }
             if (state.selectedNodeId) {
                 const node = state.nodes.find(n => n.id === state.selectedNodeId);
                 if (!node) return;
@@ -1506,6 +1586,9 @@
                             <input type="range" min="1" max="8" value="${conn.strokeWidth || 2}" onchange="updateConnectionProperty('${conn.id}', 'strokeWidth', parseInt(this.value))" class="w-full">
                         </div>
 
+                        ${(conn.points || []).length
+                            ? `<button onclick="clearWaypoints('${conn.id}')" class="w-full py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition">Xóa ${(conn.points || []).length} điểm uốn (về tự động)</button>`
+                            : `<div class="text-[10px] text-slate-400 leading-relaxed">Kéo chấm tròn nhỏ giữa đường nối để tạo điểm uốn. Nhấp đúp vào điểm uốn để xóa.</div>`}
                         <button onclick="deleteSelected()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-lg text-xs font-semibold hover:bg-rose-100 transition flex items-center justify-center gap-1">
                             <i data-lucide="trash-2" class="w-4 h-4"></i> Xóa Đường Nối Này
                         </button>
@@ -1515,7 +1598,7 @@
                 propertiesPanel.innerHTML = `
                     <div class="text-center text-xs text-slate-400 py-10">
                         <i data-lucide="mouse-pointer-click" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-                        Nhấp chọn 1 phần tử hoặc đường nối để tùy chỉnh thuộc tính.
+                        Nhấp chọn 1 phần tử hoặc đường nối để tùy chỉnh thuộc tính.<br><br>Chọn nhiều: giữ <b>Shift</b> + nhấp, hoặc giữ <b>Shift</b> + kéo trên nền. <b>Ctrl+A</b> chọn tất cả, <b>Ctrl+D</b> nhân đôi.
                     </div>
                 `;
             }
@@ -1671,6 +1754,13 @@
         }
 
         function deleteSelected() {
+            if (state.multi.size) {
+                const ids = state.multi;
+                state.nodes = state.nodes.filter(n => !ids.has(n.id));
+                state.connections = state.connections.filter(c => !ids.has(c.sourceId) && !ids.has(c.targetId));
+                showToast(`Đã xóa ${ids.size} phần tử!`, 'info');
+                state.multi = new Set(); saveHistory(); render(); return;
+            }
             if (!state.selectedNodeId && !state.selectedConnectionId) return;
             if (state.selectedNodeId) {
                 state.nodes = state.nodes.filter(n => n.id !== state.selectedNodeId);
@@ -2125,9 +2215,243 @@
             }, 2500);
         }
 
+        // ===== TABLES -> RELATIONSHIPS (Access-like) =====
+        function openTablesModal() { document.getElementById('tbl-modal').classList.remove('hidden'); document.getElementById('tbl-text').focus(); }
+        function closeTablesModal() { document.getElementById('tbl-modal').classList.add('hidden'); }
+        function fillTablesExample() {
+            document.getElementById('tbl-text').value = 'SINH_VIEN(*MaSV, HoTen, NgaySinh, MaLop)\nLOP(*MaLop, TenLop)\nHOC_PHAN(*MaHP, TenHP, SoTinChi)\nDANG_KY(*MaSV, *MaHP, Diem)';
+        }
+        function parseTables(txt) {
+            const out = [], clean = s => String(s).replace(/^[`"\[\s]+|[`"\]\s]+$/g, ''); let gc = 0;
+            if (/create\s+table/i.test(txt)) {
+                txt.split(/create\s+table/i).slice(1).forEach(seg => {
+                    seg = seg.replace(/^\s*(if\s+not\s+exists\s+)?/i, '');
+                    const i = seg.indexOf('('); if (i < 0) return;
+                    const name = clean(seg.slice(0, i).trim().split(/[\s.]+/).pop());
+                    let depth = 0, j = i;
+                    for (; j < seg.length; j++) { if (seg[j] === '(') depth++; else if (seg[j] === ')' && --depth === 0) break; }
+                    const defs = []; let cur = '', dp = 0;
+                    for (const ch of seg.slice(i + 1, j)) { if (ch === '(') dp++; if (ch === ')') dp--; if (ch === ',' && !dp) { defs.push(cur); cur = ''; } else cur += ch; }
+                    defs.push(cur);
+                    const t = { name, cols: [], pk: [], fks: [] };
+                    defs.map(d => d.trim()).filter(Boolean).forEach(d => {
+                        d = d.replace(/^constraint\s+\S+\s+/i, ''); let m;
+                        if ((m = d.match(/^primary\s+key\s*\(([^)]*)\)/i))) t.pk.push(...m[1].split(',').map(clean));
+                        else if ((m = d.match(/^foreign\s+key\s*\(([^)]*)\)\s*references\s+(\S+?)\s*\(([^)]*)\)/i))) {
+                            const a = m[1].split(',').map(clean), b = m[3].split(',').map(clean), g = gc++;
+                            a.forEach((c, k) => t.fks.push({ col: c, table: clean(m[2]), ref: b[k] || b[0], grp: g }));
+                        } else if (/^(unique|key|index|check)\b/i.test(d)) return;
+                        else {
+                            const mt = d.match(/^(\S+)\s*([a-z][a-z0-9_]*(?:\s*\([^)]*\))?)?/i); if (!mt) return;
+                            const col = { name: clean(mt[1]), type: (mt[2] || '').toUpperCase() };
+                            if (/primary\s+key/i.test(d)) t.pk.push(col.name);
+                            const r = d.match(/references\s+(\S+?)\s*\(([^)]*)\)/i); if (r) t.fks.push({ col: col.name, table: clean(r[1]), ref: clean(r[2]), grp: gc++ });
+                            t.cols.push(col);
+                        }
+                    });
+                    out.push(t);
+                });
+            } else {
+                txt.split('\n').forEach(line => {
+                    const m = line.trim().match(/^([^(]+)\(([^)]*)\)/); if (!m) return;
+                    const t = { name: m[1].trim(), cols: [], pk: [], fks: [] };
+                    m[2].split(',').map(x => x.trim()).filter(Boolean).forEach(x => { const n = x.replace(/^\*/, '').trim(); t.cols.push({ name: n, type: '' }); if (x.startsWith('*')) t.pk.push(n); });
+                    out.push(t);
+                });
+            }
+            return out;
+        }
+        function detectRefs(ts) {
+            const norm = s => String(s).toLowerCase().replace(/[^a-z0-9\u00c0-\u1ef9]/g, ''), pkOf = t => t.columns.filter(c => c.isPk); let n = 0;
+            ts.forEach(a => a.columns.forEach(c => {
+                if (c.ref || (c.isPk && pkOf(a).length === 1)) return;
+                const cn = norm(c.name);
+                const cands = ts.filter(b => b !== a && pkOf(b).length === 1 && (cn === norm(pkOf(b)[0].name) || cn === norm(b.label) + norm(pkOf(b)[0].name)));
+                if (cands.length !== 1) return;
+                c.isFk = true; c.ref = { tableId: cands[0].id, col: pkOf(cands[0])[0].name, g: 'det_' + a.id + '_' + c.id }; n++;
+            }));
+            return n;
+        }
+        function syncConnections(ts) {
+            const rc = state.connections.filter(c => c.mode === 'relational'), seen = new Set(); let made = 0;
+            ts.forEach(t => t.columns.filter(c => c.ref && !seen.has(c.ref.g) && seen.add(c.ref.g)).forEach(c => {
+                const parent = state.nodes.find(n => n.id === c.ref.tableId); if (!parent) return;
+                const ex = rc.find(x => ((x.sourceId === parent.id && x.targetId === t.id) || (x.sourceId === t.id && x.targetId === parent.id)) && (!x.srcCol || (x.sourceId === parent.id && x.srcCol === c.ref.col && x.tgtCol === c.name)));
+                if (ex) {
+                    if (!ex.srcCol) Object.assign(ex, { sourceId: parent.id, targetId: t.id, srcCol: c.ref.col, tgtCol: c.name, routing: 'orthogonal', markerStart: 'one', markerEnd: 'many' });
+                    return;
+                }
+                const k = { id: 'conn_' + Date.now() + '_' + (made++) + '_' + Math.random().toString(36).slice(2, 6), mode: 'relational', sourceId: parent.id, targetId: t.id, srcCol: c.ref.col, tgtCol: c.name, routing: 'orthogonal', dashStyle: 'solid', strokeColor: '#2563eb', strokeWidth: 2, cardinality: '', markerStart: 'one', markerEnd: 'many' };
+                state.connections.push(k); rc.push(k);
+            }));
+            return made;
+        }
+        function layoutTables(ts, x0, y0) {
+            const byId = Object.fromEntries(ts.map(t => [t.id, t])), depth = {};
+            const refs = t => [...new Set(t.columns.filter(c => c.ref && byId[c.ref.tableId] && c.ref.tableId !== t.id).map(c => c.ref.tableId))];
+            const dep = (t, seen) => depth[t.id] ?? (depth[t.id] = seen.includes(t.id) ? 0 : 1 + Math.max(-1, ...refs(t).map(r => dep(byId[r], [...seen, t.id]))));
+            const rows = []; ts.forEach(t => (rows[dep(t, [])] = rows[dep(t, [])] || []).push(t));
+            let y = y0;
+            rows.forEach((row, d) => {
+                if (!row) return;
+                const gap = d === 0 ? 460 : 300;
+                row.forEach((t, i) => { const ps = refs(t).map(r => byId[r]); t._dx = (d && ps.length) ? ps.reduce((a, p) => a + p.x + 100, 0) / ps.length - 100 : x0 + i * gap; });
+                if (d) {
+                    const g = {}; row.forEach(t => (g[Math.round(t._dx)] = g[Math.round(t._dx)] || []).push(t));
+                    Object.values(g).forEach(a => a.forEach((t, i) => { t._dx += (i - (a.length - 1) / 2) * gap; }));
+                    row.sort((a, b) => a._dx - b._dx);
+                    row.forEach((t, i) => { if (i && t._dx < row[i - 1]._dx + gap) t._dx = row[i - 1]._dx + gap; });
+                    const mn = Math.min(...row.map(t => t._dx)); if (mn < 40) row.forEach(t => { t._dx += 40 - mn; });
+                }
+                row.forEach(t => { t.x = Math.round(t._dx / 10) * 10; t.y = y; delete t._dx; });
+                y += Math.max(...row.map(t => 32 + 24 * Math.max(1, t.columns.length))) + 90;
+            });
+        }
+        function importTables() {
+            const parsed = parseTables(document.getElementById('tbl-text').value);
+            if (!parsed.length) { showToast('Không đọc được bảng nào. Dùng TEN_BANG(*KhoaChinh, Cot) hoặc CREATE TABLE.', 'warning'); return; }
+            const old = state.nodes.filter(n => n.mode === 'relational' && n.mainType === 'table'), have = new Set(old.map(n => n.label.toLowerCase())), stamp = Date.now(), fresh = [], by = {};
+            parsed.forEach((p, i) => {
+                if (have.has(p.name.replace(/\s+/g, '_').toLowerCase())) return;
+                const t = { id: 'tbl_' + stamp + '_' + i, mode: 'relational', mainType: 'table', subType: 'table', x: 0, y: 0, w: 200, h: 120, label: p.name.replace(/\s+/g, '_'), fillColor: '#ffffff', borderColor: '#2563eb', textColor: '#1e293b',
+                    columns: p.cols.map((c, k) => ({ id: 'col_' + stamp + '_' + i + '_' + k, name: c.name, isPk: p.pk.includes(c.name), isFk: false, dataType: c.type || (p.pk.includes(c.name) ? 'INT' : 'VARCHAR(255)') })) };
+                fresh.push(t); by[t.id] = p;
+            });
+            if (!fresh.length) { showToast('Các bảng này đã có trong sơ đồ.', 'info'); return; }
+            const all = old.concat(fresh);
+            fresh.forEach(t => by[t.id].fks.forEach(f => {
+                const tg = all.find(x => x.label.toLowerCase() === f.table.replace(/\s+/g, '_').toLowerCase()), c = t.columns.find(x => x.name === f.col), rc = tg && tg.columns.find(x => x.name === f.ref);
+                if (c && rc) { c.isFk = true; c.ref = { tableId: tg.id, col: rc.name, g: 'imp_' + t.id + '_' + f.grp }; }
+            }));
+            const found = detectRefs(all);
+            const y0 = old.length ? Math.max(...old.map(n => n.y + n.h)) + 100 : 80;
+            layoutTables(fresh, 100, y0);
+            state.nodes.push(...fresh);
+            const made = syncConnections(all);
+            switchMode('relational'); saveHistory(); closeTablesModal(); render();
+            showToast(`Đã tạo ${fresh.length} bảng, ${made} quan hệ (${found} khóa ngoại tự dò)`, 'success');
+        }
+        function autoDetectRelations() {
+            const ts = state.nodes.filter(n => n.mode === 'relational' && n.mainType === 'table');
+            if (ts.length < 2) { showToast('Cần ít nhất 2 bảng để dò quan hệ.', 'warning'); return; }
+            const found = detectRefs(ts), made = syncConnections(ts);
+            saveHistory(); render();
+            showToast(found || made ? `Dò được ${found} khóa ngoại mới, ${made} đường nối` : 'Không tìm thấy quan hệ mới. Cột khóa ngoại cần trùng tên với khóa chính bảng cha.', found || made ? 'success' : 'info');
+        }
+
+        // ===== MULTI-SELECT, WAYPOINTS =====
+        state.multi = new Set();
+        const marqueeEl = document.createElement('div');
+        marqueeEl.className = 'absolute border border-blue-500 bg-blue-500/10 pointer-events-none hidden z-20';
+        container.appendChild(marqueeEl);
+        const selectedIds = () => state.multi.size ? [...state.multi] : (state.selectedNodeId ? [state.selectedNodeId] : []);
+        function setMulti(set) {
+            state.selectedConnectionId = null;
+            if (set.size <= 1) { state.multi = new Set(); state.selectedNodeId = [...set][0] || null; }
+            else { state.multi = set; state.selectedNodeId = null; }
+        }
+        function toggleMulti(id) {
+            const cur = new Set(state.multi); if (!cur.size && state.selectedNodeId) cur.add(state.selectedNodeId);
+            if (cur.has(id)) cur.delete(id); else cur.add(id);
+            setMulti(cur); renderNodes(); renderConnections(); renderPropertiesPanel();
+        }
+        function selectAllNodes() { setMulti(new Set(state.nodes.filter(n => n.mode === state.mode).map(n => n.id))); renderNodes(); renderConnections(); renderPropertiesPanel(); }
+        function startGroupDrag(id) {
+            state.dragGroup = null; state.dragGroupConns = null;
+            if (state.multi.size > 1 && state.multi.has(id)) {
+                state.dragGroup = {}; state.nodes.forEach(n => { if (state.multi.has(n.id)) state.dragGroup[n.id] = { x: n.x, y: n.y }; });
+                state.dragGroupConns = state.connections.filter(c => state.multi.has(c.sourceId) && state.multi.has(c.targetId) && c.points && c.points.length).map(c => ({ c, pts: c.points.map(p => ({ ...p })) }));
+            }
+        }
+        function startMarquee(e) {
+            const base = new Set(state.multi); if (state.selectedNodeId) base.add(state.selectedNodeId);
+            state.marquee = { sx: e.clientX, sy: e.clientY, base };
+            marqueeEl.classList.remove('hidden'); updateMarquee(e);
+        }
+        function updateMarquee(e) {
+            const m = state.marquee, r = container.getBoundingClientRect();
+            const x0 = Math.min(m.sx, e.clientX), x1 = Math.max(m.sx, e.clientX), y0 = Math.min(m.sy, e.clientY), y1 = Math.max(m.sy, e.clientY);
+            Object.assign(marqueeEl.style, { left: (x0 - r.left) + 'px', top: (y0 - r.top) + 'px', width: (x1 - x0) + 'px', height: (y1 - y0) + 'px' });
+            const wx0 = (x0 - r.left - state.pan.x) / state.zoom, wx1 = (x1 - r.left - state.pan.x) / state.zoom, wy0 = (y0 - r.top - state.pan.y) / state.zoom, wy1 = (y1 - r.top - state.pan.y) / state.zoom;
+            const hit = new Set(m.base);
+            state.nodes.filter(n => n.mode === state.mode && n.x < wx1 && n.x + n.w > wx0 && n.y < wy1 && n.y + n.h > wy0).forEach(n => hit.add(n.id));
+            setMulti(hit); renderNodes();
+        }
+        function endMarquee() { state.marquee = null; marqueeEl.classList.add('hidden'); renderConnections(); renderPropertiesPanel(); }
+        function duplicateSelection() {
+            const ids = selectedIds(); if (!ids.length) return;
+            const map = {}, stamp = Date.now(), copies = [];
+            ids.forEach((id, i) => { const n = state.nodes.find(x => x.id === id); if (!n) return; const c = JSON.parse(JSON.stringify(n)); c.id = 'node_' + stamp + '_' + i; c.x += 30; c.y += 30; map[id] = c.id; copies.push(c); });
+            copies.forEach(c => (c.columns || []).forEach(col => { if (col.ref && map[col.ref.tableId]) col.ref.tableId = map[col.ref.tableId]; }));
+            state.nodes.push(...copies);
+            state.connections.filter(c => map[c.sourceId] && map[c.targetId]).forEach((c, i) => {
+                const k = JSON.parse(JSON.stringify(c)); k.id = 'conn_' + stamp + '_' + i; k.sourceId = map[c.sourceId]; k.targetId = map[c.targetId];
+                (k.points || []).forEach(p => { p.x += 30; p.y += 30; }); state.connections.push(k);
+            });
+            setMulti(new Set(copies.map(c => c.id))); saveHistory(); render(); showToast(`Đã nhân đôi ${copies.length} phần tử`, 'success');
+        }
+        function alignSel(kind) {
+            const ns = state.nodes.filter(n => state.multi.has(n.id)); if (ns.length < 2) return;
+            const minX = Math.min(...ns.map(n => n.x)), maxX = Math.max(...ns.map(n => n.x + n.w)), minY = Math.min(...ns.map(n => n.y)), maxY = Math.max(...ns.map(n => n.y + n.h));
+            if (kind === 'left') ns.forEach(n => { n.x = minX; });
+            else if (kind === 'right') ns.forEach(n => { n.x = maxX - n.w; });
+            else if (kind === 'hc') ns.forEach(n => { n.x = (minX + maxX) / 2 - n.w / 2; });
+            else if (kind === 'top') ns.forEach(n => { n.y = minY; });
+            else if (kind === 'bottom') ns.forEach(n => { n.y = maxY - n.h; });
+            else if (kind === 'vc') ns.forEach(n => { n.y = (minY + maxY) / 2 - n.h / 2; });
+            else {
+                const h = kind === 'dh', key = h ? 'x' : 'y', sz = h ? 'w' : 'h', a = [...ns].sort((p, q) => p[key] - q[key]);
+                const gap = ((h ? maxX - minX : maxY - minY) - a.reduce((t, n) => t + n[sz], 0)) / (a.length - 1); let pos = h ? minX : minY;
+                a.forEach(n => { n[key] = pos; pos += n[sz] + gap; });
+            }
+            ns.forEach(n => { n.x = Math.round(n.x); n.y = Math.round(n.y); });
+            saveHistory(); renderNodes(); renderConnections();
+        }
+        function setMultiProp(prop, val) { state.nodes.forEach(n => { if (state.multi.has(n.id)) n[prop] = val; }); renderNodes(); commitSoon(); }
+        function renderMultiPanel() {
+            const b = (k, l) => `<button type="button" class="chip" onclick="alignSel('${k}')">${l}</button>`;
+            const col = (p, l) => `<div><label class="block text-[11px] font-semibold text-slate-500 mb-1">${l}</label><input type="color" onchange="setMultiProp('${p}', this.value)" class="w-full h-8 rounded border border-slate-200 dark:border-slate-700 cursor-pointer"></div>`;
+            propertiesPanel.innerHTML = `<div class="space-y-4">
+                <div class="p-2.5 bg-blue-50 dark:bg-blue-950/50 rounded-xl border border-blue-200 dark:border-blue-800 font-bold text-xs text-blue-700 dark:text-blue-300">Đã chọn ${state.multi.size} phần tử</div>
+                <div><label class="block text-xs font-semibold text-slate-500 mb-1">Căn chỉnh</label>
+                    <div class="flex flex-wrap gap-1.5">${b('left', '⇤ Trái')}${b('hc', '↔ Giữa ngang')}${b('right', 'Phải ⇥')}${b('top', '⤒ Trên')}${b('vc', '↕ Giữa dọc')}${b('bottom', 'Dưới ⤓')}${b('dh', 'Dàn đều ngang')}${b('dv', 'Dàn đều dọc')}</div></div>
+                <div class="grid grid-cols-3 gap-2">${col('fillColor', 'Màu nền')}${col('borderColor', 'Màu viền')}${col('textColor', 'Màu chữ')}</div>
+                <button onclick="duplicateSelection()" class="w-full py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition">Nhân đôi (Ctrl+D)</button>
+                <button onclick="deleteSelected()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-lg text-xs font-semibold hover:bg-rose-100 transition">Xóa ${state.multi.size} phần tử</button>
+            </div>`;
+        }
+        function insertWaypoint(id, i, x, y) {
+            const c = state.connections.find(k => k.id === id); if (!c) return;
+            c.points = c.points || []; c.points.splice(i, 0, { x, y });
+            state.wpDrag = { id, idx: i, moved: false }; renderConnections();
+        }
+        function clearWaypoints(id) { const c = state.connections.find(k => k.id === id); if (c) { c.points = []; saveHistory(); render(); } }
+        function buildWaypointPath(conn, s, t) {
+            const pts = [s, ...conn.points, t], r = conn.routing; let d = `M ${pts[0].x} ${pts[0].y}`;
+            if (r === 'bezier') {
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+                    d += ` C ${p1.x + (p2.x - p0.x) / 6} ${p1.y + (p2.y - p0.y) / 6}, ${p2.x - (p3.x - p1.x) / 6} ${p2.y - (p3.y - p1.y) / 6}, ${p2.x} ${p2.y}`;
+                }
+                return d;
+            }
+            for (let i = 1; i < pts.length; i++) {
+                const b = pts[i], hFirst = (r === 'orthogonal') !== (i === pts.length - 1);
+                if (r === 'orthogonal' || r === 'orthogonal_v') d += hFirst ? ` H ${b.x} V ${b.y}` : ` V ${b.y} H ${b.x}`;
+                else d += ` L ${b.x} ${b.y}`;
+            }
+            return d;
+        }
+
         // ===== HELPERS =====
         const MARKERS = [['none', 'Không'], ['arrow', '▶ Đặc'], ['open', '› Mở'], ['tri_open', '△ Rỗng'], ['diamond', '◆ Thoi'], ['diamond_open', '◇ Thoi rỗng'], ['circle', '● Tròn'], ['circle_open', '○ Tròn rỗng'], ['bar', '| Một'], ['one', '‖ Đúng một'], ['many', '⋔ Nhiều'], ['one_many', '|⋔ Một-nhiều'], ['zero_one', '○| 0..1'], ['zero_many', '○⋔ 0..N']];
         function getConnAnchors(conn, s, t) {
+            const wps = conn.points || [], colMode = s.mainType === 'table' && t.mainType === 'table' && (conn.srcCol || conn.tgtCol);
+            if (wps.length && !colMode) {
+                const sides = n => [{ x: n.x + n.w / 2, y: n.y }, { x: n.x + n.w, y: n.y + n.h / 2 }, { x: n.x + n.w / 2, y: n.y + n.h }, { x: n.x, y: n.y + n.h / 2 }];
+                const near = (arr, p) => arr.reduce((a, b) => Math.hypot(b.x - p.x, b.y - p.y) < Math.hypot(a.x - p.x, a.y - p.y) ? b : a);
+                return { sAnchor: near(sides(s), wps[0]), tAnchor: near(sides(t), wps[wps.length - 1]), loop: null };
+            }
             if (s.mainType !== 'table' || t.mainType !== 'table' || !(conn.srcCol || conn.tgtCol)) return getBestAnchorPoints(s, t);
             const rowY = (n, name) => { const i = (n.columns || []).findIndex(c => c.name === name); return i < 0 ? n.y + n.h / 2 : n.y + 32 + i * 24 + 12; };
             const sy = rowY(s, conn.srcCol), ty = rowY(t, conn.tgtCol);
@@ -2135,7 +2459,7 @@
             if (s.x < t.x + t.w && t.x < s.x + s.w) { sx = s.x; tx = t.x; loop = Math.min(sx, tx) - 30; }
             else if (s.x + s.w / 2 > t.x + t.w / 2) { sx = s.x; tx = t.x + t.w; }
             else { sx = s.x + s.w; tx = t.x; }
-            return { sAnchor: { x: sx, y: sy }, tAnchor: { x: tx, y: ty }, loop };
+            return { sAnchor: { x: sx, y: sy }, tAnchor: { x: tx, y: ty }, loop: (conn.points || []).length ? null : loop };
         }
         function dblMask(id, d, w) {
             const NS = 'http://www.w3.org/2000/svg', m = document.createElementNS(NS, 'mask');
