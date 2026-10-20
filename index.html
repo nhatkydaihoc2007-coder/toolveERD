@@ -926,15 +926,12 @@ else if (e.key === 'Escape') {
 
         // CONNECTIONS MANAGEMENT
         function createConnection(sourceId, targetId) {
-            const exists = state.connections.some(c => 
-                (c.sourceId === sourceId && c.targetId === targetId) || 
-                (c.sourceId === targetId && c.targetId === sourceId)
-            );
-
-            if (exists) {
-                showToast('Hai phần tử này đã có đường liên kết!', 'warning');
-                return;
-            }
+            const between = state.connections.filter(c => (c.sourceId === sourceId && c.targetId === targetId) || (c.sourceId === targetId && c.targetId === sourceId));
+const hasRel = [sourceId, targetId].some(id => (state.nodes.find(n => n.id === id) || {}).mainType === 'relationship');
+if (between.length && !(state.mode === 'erd' && hasRel && between.length < 2)) {
+    showToast('Hai phần tử này đã có đường liên kết!', 'warning');
+    return;
+}
 
             const newConn = {
                 id: 'conn_' + Date.now(),
@@ -949,7 +946,11 @@ else if (e.key === 'Escape') {
                 markerStart: state.mode === 'relational' ? 'one' : 'none',
                 markerEnd: state.mode === 'relational' ? 'many' : 'none'
             };
-
+            if (between.length === 1) {   // dây thứ 2: tự uốn cong để không đè lên dây thứ nhất
+    const a = getNodeCenter(state.nodes.find(n => n.id === sourceId)), b = getNodeCenter(state.nodes.find(n => n.id === targetId));
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+    newConn.points = [{ x: Math.round((a.x + b.x) / 2 - dy / len * 70), y: Math.round((a.y + b.y) / 2 + dx / len * 70) }];
+}
             state.connections.push(newConn);
             selectConnection(newConn.id);
             saveHistory();
@@ -1903,27 +1904,72 @@ else if (e.key === 'Escape') {
                 const sup = pool.reduce((a, b) => b.o.y < a.o.y ? b : a);
                 es.filter(x => x !== sup).forEach(x => { subOf[x.o.id] = sup.o; });
             });
-            ents.forEach(e => mk(e.id, e.label));
-            ents.forEach(e => {
-                const t = T[e.id];
-                nb(e.id).filter(x => isAttr(x, 'derived', 'multivalued')).forEach(({ o }) => add(t, q(o.label), o.subType === 'pk' ? 'INT' : 'VARCHAR(255)', o.subType === 'pk' || o.subType === 'partial_pk', o.subType === 'fk'));
-                if (!t.columns.some(c => c.isPk) && e.subType !== 'weak' && !subOf[e.id]) add(t, 'id', 'INT', true, false);
-            });
-            Object.keys(subOf).forEach(id => link(T[id], subOf[id], true));   // subclass PK = FK -> superclass PK
-            ents.forEach(e => nb(e.id).filter(x => x.o.subType === 'multivalued' && x.o.mainType === 'attribute').forEach(({ o }) => {
-                const t = mk(o.id, e.label + '_' + o.label); link(t, e, true); add(t, q(o.label), 'VARCHAR(255)', true, false);
-            }));
-            N.filter(n => n.mainType === 'relationship').forEach(r => {
-                const ends = nb(r.id).filter(x => x.o.mainType === 'entity'), extra = nb(r.id).filter(x => isAttr(x, 'derived', 'multivalued'));
-                if (ends.length < 2) return;
-                const many = x => /[NM*]/i.test(x.c.cardinality || ''), addExtra = t => extra.forEach(({ o }) => add(t, q(o.label), 'VARCHAR(255)', false, false));
-                if (ends.length > 2 || ends.every(many)) {
-                    const t = mk(r.id, r.label); ends.forEach(x => link(t, x.o, true, r.label)); addExtra(t);
-                } else {
-                    const ch = ends.find(many) || ends.find(x => x.o.subType === 'weak') || ends[0], pa = ends.find(x => x !== ch);
-                    link(T[ch.o.id], pa.o, r.subType === 'identifying' && ch.o.subType === 'weak', r.label); addExtra(T[ch.o.id]);
-                }
-            });
+            const warn = [];
+const guessType = name => {
+    const s = String(name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '');
+    if (/ngay|date/.test(s)) return 'DATE';
+    if (/^(sdt|dienthoai|phone|sodt)/.test(s)) return 'VARCHAR(15)';
+    if (/email/.test(s)) return 'VARCHAR(100)';
+    if (/^(dongia|giaban|giamua|thanhtien|tongtien|luong|price|salary|amount)|^gia$|^tien$/.test(s)) return 'DECIMAL(12,2)';
+    if (/^(diem|gpa)/.test(s)) return 'DECIMAL(4,2)';
+    if (/^(soluong|sotinchi|tuoi|stt|sl)$/.test(s)) return 'INT';
+    return 'VARCHAR(255)';
+};
+ents.forEach(e => mk(e.id, e.label));
+ents.forEach(e => {
+    const t = T[e.id];
+    nb(e.id).filter(x => isAttr(x, 'derived', 'multivalued')).forEach(({ o }) => add(t, q(o.label), o.subType === 'pk' ? 'INT' : guessType(o.label), o.subType === 'pk' || o.subType === 'partial_pk', o.subType === 'fk'));
+    if (!t.columns.some(c => c.isPk) && e.subType !== 'weak' && e.subType !== 'associative' && !subOf[e.id]) add(t, 'id', 'INT', true, false);
+});
+
+// 1) Chuyên biệt hóa: siêu lớp xử lý trước, lớp con sau
+let left = Object.keys(subOf), guard = 0; const done = new Set();
+while (left.length && guard++ < 20) left = left.filter(id => {
+    const sup = subOf[id]; if (subOf[sup.id] && !done.has(sup.id)) return true;
+    link(T[id], sup, true); done.add(id); return false;
+});
+
+// 2) Quan hệ
+const rels = N.filter(n => n.mainType === 'relationship');
+const doRel = r => {
+    const ends = nb(r.id).filter(x => x.o.mainType === 'entity'), extra = nb(r.id).filter(x => isAttr(x, 'derived', 'multivalued'));
+    if (ends.length < 2) { warn.push(`Quan hệ "${r.label}" chưa nối đủ 2 thực thể`); return; }
+    const many = x => /[NM*]/i.test(x.c.cardinality || ''), addExtra = t => extra.forEach(({ o }) => add(t, q(o.label), guessType(o.label), false, false));
+    if (ends.length > 2 || ends.every(many)) {
+        const t = mk(r.id, r.label); ends.forEach(x => link(t, x.o, true, r.label)); addExtra(t);
+    } else {
+        if (!ends.some(x => (x.c.cardinality || '').trim())) warn.push(`Quan hệ "${r.label}" chưa ghi bản số (1 / N) nên tạm coi là 1:1`);
+        const ch = ends.find(many) || ends.find(x => x.o.subType === 'weak') || ends.find(x => x.c.lineKind === 'double') || ends[1], pa = ends.find(x => x !== ch);
+        link(T[ch.o.id], pa.o, r.subType === 'identifying' && ch.o.subType === 'weak', r.label); addExtra(T[ch.o.id]);
+    }
+};
+rels.filter(r => r.subType === 'identifying').forEach(doRel);   // thực thể yếu lấy khóa trước
+
+// 3) Thực thể kết hợp: nối trực tiếp tới các thực thể, khóa chính = các FK (nếu không có khóa riêng)
+ents.filter(e => e.subType === 'associative').forEach(e => {
+    const t = T[e.id], own = t.columns.some(c => c.isPk), ps = nb(e.id).filter(x => x.o.mainType === 'entity' && x.o !== e);
+    if (ps.length < 2) warn.push(`Thực thể kết hợp "${e.label}" nên nối trực tiếp tới ít nhất 2 thực thể`);
+    ps.forEach(x => link(t, x.o, !own, x.o.label));
+});
+rels.filter(r => r.subType !== 'identifying').forEach(doRel);
+
+// 4) Thuộc tính đa trị: bảng riêng (làm sau cùng vì cần khóa chính của thực thể đã đủ)
+ents.forEach(e => nb(e.id).filter(x => x.o.subType === 'multivalued' && x.o.mainType === 'attribute').forEach(({ o }) => {
+    const t = mk(o.id, e.label + '_' + o.label); link(t, e, true); add(t, q(o.label), 'VARCHAR(255)', true, false);
+}));
+
+// 5) Thuộc tính FK vẽ trong ERD: dò bảng cha theo tên khóa chính
+out.forEach(t => t.columns.filter(c => c.isFk && !c.ref).forEach(c => {
+    const pks = b => b.columns.filter(k => k.isPk), cand = out.filter(b => b !== t && pks(b).length === 1 && pks(b)[0].name.toLowerCase() === c.name.toLowerCase());
+    if (cand.length === 1) { c.ref = { tableId: cand[0].id, col: pks(cand[0])[0].name, g: ++gid }; c.dataType = pks(cand[0])[0].dataType; }
+    else warn.push(`Cột FK "${c.name}" trong bảng ${t.label} chưa tìm được bảng cha (hãy đặt tên trùng khóa chính của bảng cha)`);
+}));
+out.forEach(t => { if (!t.columns.some(c => c.isPk)) warn.push(`Bảng ${t.label} chưa có khóa chính`); });
+C.forEach(c => {
+    const a = N.find(n => n.id === c.sourceId), b = N.find(n => n.id === c.targetId);
+    if (a && b && a.mainType === 'entity' && b.mainType === 'entity' && a.subType !== 'associative' && b.subType !== 'associative')
+        warn.push(`Đường nối trực tiếp ${a.label} – ${b.label} (không qua hình thoi) đã bị bỏ qua`);
+});
             // Layout: parents on top, child/junction tables below, centred between the tables they reference
             const byId = Object.fromEntries(out.map(t => [t.id, t])), depth = {};
             const refs = t => [...new Set(t.columns.filter(c => c.ref && c.ref.tableId !== t.id).map(c => c.ref.tableId))];
@@ -1954,6 +2000,7 @@ else if (e.key === 'Escape') {
             state.connections = state.connections.filter(c => c.mode !== 'relational').concat(conns);
             switchMode('relational'); saveHistory();
             showToast(`Đã tạo ${out.length} bảng và ${conns.length} liên kết khóa ngoại!`, 'success');
+            if (warn.length) setTimeout(() => alert('Lưu ý khi chuyển sang Schema:\n\n• ' + warn.join('\n• ')), 400);
         }
 
         // EXPORT ENGINE (HD PNG & VECTOR SVG)
