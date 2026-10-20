@@ -380,7 +380,7 @@
                 <button onclick="zoomCanvas(-0.1)" class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Thu nhỏ">
                     <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
                 </button>
-                <button onclick="resetZoom()" class="px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition font-mono" id="zoom-text">
+                <button onclick="resetZoom()" class="px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition font-mono" id="zoom-text"><button onclick="fitView()" class="px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Vừa khung (F)">Vừa khung</button>
                     100%
                 </button>
 
@@ -400,7 +400,7 @@
             <!-- Connect Tool Hint Banner -->
             <div id="connect-hint" class="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-amber-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg hidden flex items-center gap-2 animate-bounce">
                 <i data-lucide="link" class="w-3.5 h-3.5"></i>
-                <span>Nhấp chọn phần tử thứ nhất, sau đó chọn phần tử thứ hai để nối dây!</span>
+                <span>Chế độ nối liên tục: nhấp nguồn → nhấp đích. Nhấn Esc hoặc V để thoát.</span>
             </div>
 
             <!-- Transform Viewport Space -->
@@ -659,6 +659,13 @@
                     }
                     deselectAll();
                 }
+                container.addEventListener('dblclick', (e) => {
+    if (e.target !== container && e.target !== mainSvg) return;
+    const r = container.getBoundingClientRect();
+    let x = (e.clientX - r.left - state.pan.x) / state.zoom - 60, y = (e.clientY - r.top - state.pan.y) / state.zoom - 25;
+    if (state.gridSnap) { x = Math.round(x / 10) * 10; y = Math.round(y / 10) * 10; }
+    if (state.mode === 'erd') addNode('entity', 'strong', x, y); else addNode('table', 'table', x, y);
+});
             });
 
             window.addEventListener('mousemove', (e) => {
@@ -736,9 +743,23 @@
                     return;
                 }
                 if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
-                else if (k === 'v') setToolMode('select');
-                else if (k === 'c') setToolMode('connect');
-                else if (e.key === 'Escape') { setToolMode('select'); deselectAll(); }
+else if (k === 'v') setToolMode('select');
+else if (k === 'c') setToolMode('connect');
+else if (k === 'f') fitView();
+else if ((k === 'a' || k === 'k') && state.mode === 'erd' && selectedIds().length === 1) {
+    e.preventDefault(); addAttributeTo(selectedIds()[0], k === 'k' ? 'pk' : 'simple');
+}
+else if (e.key.startsWith('Arrow') && selectedIds().length) {
+    e.preventDefault();
+    const st = e.shiftKey ? 50 : state.gridSize, ids = selectedIds();
+    const dx = e.key === 'ArrowLeft' ? -st : e.key === 'ArrowRight' ? st : 0, dy = e.key === 'ArrowUp' ? -st : e.key === 'ArrowDown' ? st : 0;
+    state.nodes.forEach(n => { if (ids.includes(n.id)) { n.x += dx; n.y += dy; } });
+    renderNodes(); renderConnections(); commitSoon();
+}
+else if (e.key === 'Escape') {
+    if (state.toolMode === 'connect' && state.connectSourceNodeId) { state.connectSourceNodeId = null; renderNodes(); }
+    else { setToolMode('select'); deselectAll(); }
+}
             });
 
             inlineEditor.addEventListener('blur', saveInlineText);
@@ -760,6 +781,7 @@
 
             const hint = document.getElementById('connect-hint');
             if (mode === 'connect') hint.classList.remove('hidden'); else hint.classList.add('hidden');
+            renderNodes();
         }
 
         function zoomCanvas(delta) {
@@ -810,7 +832,7 @@
         }
 
         // ADD NEW NODES (WITH MAIN TYPE AND SUB TYPE)
-        function addNode(mainType, subType) {
+        function addNode(mainType, subType, px, py) {
             const x = Math.round((220 - state.pan.x) / state.zoom / 10) * 10;
             const y = Math.round((160 - state.pan.y) / state.zoom / 10) * 10;
 
@@ -839,7 +861,7 @@
                     { id: 'c2', name: 'ten', isPk: false, isFk: false, dataType: 'VARCHAR(255)' }
                 ] : []
             };
-
+            if (px !== undefined) { newNode.x = px; newNode.y = py; }
             state.nodes.push(newNode);
             selectNode(id);
             saveHistory();
@@ -874,6 +896,7 @@
 
         // SELECTION MANAGEMENT
         function deselectAll() {
+            state.connectSourceNodeId = null;
             state.multi.clear();
             state.selectedNodeId = null;
             state.selectedConnectionId = null;
@@ -1129,7 +1152,7 @@
             const currentNodes = state.nodes.filter(n => n.mode === state.mode);
 
             currentNodes.forEach(node => {
-                const isSelected = state.selectedNodeId === node.id || state.multi.has(node.id);
+                const isSelected = state.selectedNodeId === node.id || state.multi.has(node.id) || state.connectSourceNodeId === node.id;
                 const gNode = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 gNode.id = node.id;
                 gNode.setAttribute('transform', `translate(${node.x}, ${node.y})`);
@@ -1139,15 +1162,19 @@
                     if (state.justDragged) { e.stopPropagation(); return; }
                     e.stopPropagation();
                     if (state.toolMode === 'connect') {
-                        if (!state.connectSourceNodeId) {
-                            state.connectSourceNodeId = node.id;
-                            showToast('Đã chọn phần tử nguồn. Nhấp chọn phần tử thứ hai!', 'info');
-                        } else if (state.connectSourceNodeId !== node.id) {
-                            createConnection(state.connectSourceNodeId, node.id);
-                            state.connectSourceNodeId = null;
-                            setToolMode('select');
-                        }
-                    } else {
+    if (!state.connectSourceNodeId) {
+        state.connectSourceNodeId = node.id;
+        renderNodes();
+        showToast('Đã chọn nguồn. Nhấp phần tử thứ hai để nối (Esc để hủy)', 'info');
+    } else if (state.connectSourceNodeId !== node.id) {
+        createConnection(state.connectSourceNodeId, node.id);
+        state.connectSourceNodeId = null;   // giữ nguyên chế độ nối
+        renderNodes();
+    } else {
+        state.connectSourceNodeId = null;   // bấm lại chính nó = bỏ chọn nguồn
+        renderNodes();
+    }
+} else {
                         selectNode(node.id, e.shiftKey || e.ctrlKey || e.metaKey);
                     }
                 };
@@ -1471,7 +1498,18 @@
                     // ERD NODES TYPE & SUB-TYPE SWITCHER
                     propertiesPanel.innerHTML = `
                         <div class="space-y-4">
-                            
+                            ${state.mode === 'erd' && node.mainType !== 'specialization' ? `
+<div class="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-2">
+    <div class="text-xs font-bold text-emerald-700 dark:text-emerald-300">Thêm nhanh thuộc tính (phím A / K)</div>
+    <div class="flex flex-wrap gap-1.5">
+        <button type="button" class="chip" onclick="addAttributeTo('${node.id}','simple')">+ Thường</button>
+        <button type="button" class="chip" onclick="addAttributeTo('${node.id}','pk')">+ PK</button>
+        <button type="button" class="chip" onclick="addAttributeTo('${node.id}','fk')">+ FK</button>
+        <button type="button" class="chip" onclick="addAttributeTo('${node.id}','multivalued')">+ Đa trị</button>
+        <button type="button" class="chip" onclick="addAttributeTo('${node.id}','derived')">+ Dẫn xuất</button>
+        <button type="button" class="chip" onclick="addAttributesBulk('${node.id}')">+ Nhiều thuộc tính…</button>
+    </div>
+</div>` : ''}
                             <!-- MAIN TYPE & SUB-TYPE SELECTOR PANEL -->
                             <div class="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
                                 <div class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
@@ -1589,6 +1627,7 @@
                         ${(conn.points || []).length
                             ? `<button onclick="clearWaypoints('${conn.id}')" class="w-full py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition">Xóa ${(conn.points || []).length} điểm uốn (về tự động)</button>`
                             : `<div class="text-[10px] text-slate-400 leading-relaxed">Kéo chấm tròn nhỏ giữa đường nối để tạo điểm uốn. Nhấp đúp vào điểm uốn để xóa.</div>`}
+                        <button onclick="swapConn('${conn.id}')" class="w-full py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition">⇄ Đảo chiều đường nối (cha ↔ con)</button>
                         <button onclick="deleteSelected()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-lg text-xs font-semibold hover:bg-rose-100 transition flex items-center justify-center gap-1">
                             <i data-lucide="trash-2" class="w-4 h-4"></i> Xóa Đường Nối Này
                         </button>
@@ -2416,6 +2455,7 @@
                 <div><label class="block text-xs font-semibold text-slate-500 mb-1">Căn chỉnh</label>
                     <div class="flex flex-wrap gap-1.5">${b('left', '⇤ Trái')}${b('hc', '↔ Giữa ngang')}${b('right', 'Phải ⇥')}${b('top', '⤒ Trên')}${b('vc', '↕ Giữa dọc')}${b('bottom', 'Dưới ⤓')}${b('dh', 'Dàn đều ngang')}${b('dv', 'Dàn đều dọc')}</div></div>
                 <div class="grid grid-cols-3 gap-2">${col('fillColor', 'Màu nền')}${col('borderColor', 'Màu viền')}${col('textColor', 'Màu chữ')}</div>
+                ${state.mode === 'erd' ? `<button onclick="linkWithRelationship()" class="w-full py-2 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-semibold hover:bg-amber-100 transition">◇ Nối 2 thực thể bằng một Quan hệ</button>` : ''}
                 <button onclick="duplicateSelection()" class="w-full py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition">Nhân đôi (Ctrl+D)</button>
                 <button onclick="deleteSelected()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-lg text-xs font-semibold hover:bg-rose-100 transition">Xóa ${state.multi.size} phần tử</button>
             </div>`;
@@ -2442,7 +2482,73 @@
             }
             return d;
         }
-
+        // ===== QUICK TOOLS =====
+function _attrParent(id) {
+    const p = state.nodes.find(n => n.id === id); if (!p) return null;
+    if (p.mainType === 'attribute') {
+        const c = state.connections.find(c => c.mode === 'erd' && (c.sourceId === id || c.targetId === id));
+        if (c) { const o = state.nodes.find(n => n.id === (c.sourceId === id ? c.targetId : c.sourceId)); if (o && o.mainType !== 'specialization') return o; }
+        return null;
+    }
+    return (p.mainType === 'entity' || p.mainType === 'relationship') ? p : null;
+}
+function _mkAttr(p, subType, label) {
+    const kids = state.connections.filter(c => c.mode === 'erd' && (c.sourceId === p.id || c.targetId === p.id)).length;
+    const a = (-150 + kids * 38) * Math.PI / 180, cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+    let x = cx + (p.w / 2 + 110) * Math.cos(a) - 55, y = cy + (p.h / 2 + 75) * Math.sin(a) - 22;
+    if (state.gridSnap) { x = Math.round(x / 10) * 10; y = Math.round(y / 10) * 10; }
+    const n = { id: 'node_' + Date.now() + '_' + Math.floor(Math.random() * 100000), mode: 'erd', mainType: 'attribute', subType, x, y, w: 110, h: 44, label,
+        fillColor: '#ffffff', borderColor: getDefaultBorderColor('attribute'), textColor: '#1e293b', columns: [] };
+    state.nodes.push(n);
+    state.connections.push({ id: 'conn_' + Date.now() + '_' + Math.floor(Math.random() * 100000), mode: 'erd', sourceId: p.id, targetId: n.id,
+        routing: 'straight', dashStyle: 'solid', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: '', markerStart: 'none', markerEnd: 'none' });
+    return n;
+}
+function addAttributeTo(id, subType = 'simple') {
+    const p = _attrParent(id);
+    if (!p) { showToast('Chọn một thực thể / quan hệ (chế độ ERD) để thêm thuộc tính', 'warning'); return; }
+    const n = _mkAttr(p, subType, getDefaultLabel('attribute', subType));
+    selectNode(n.id); saveHistory(); render();
+    setTimeout(() => openInlineTextEditor(n), 0);
+}
+function addAttributesBulk(id) {
+    const p = _attrParent(id); if (!p) return;
+    const s = prompt('Nhập các thuộc tính, cách nhau bằng dấu phẩy.\nĐặt dấu * để làm khóa chính. Ví dụ: *MaSV, HoTen, NgaySinh', '');
+    if (!s) return;
+    const list = s.split(',').map(x => x.trim()).filter(Boolean); if (!list.length) return;
+    list.forEach(x => _mkAttr(p, (x.startsWith('*') || x.endsWith('*')) ? 'pk' : 'simple', x.replace(/\*/g, '').trim() || 'Thuoc_Tinh'));
+    saveHistory(); render(); showToast(`Đã thêm ${list.length} thuộc tính`, 'success');
+}
+function linkWithRelationship() {
+    const ns = state.nodes.filter(n => state.multi.has(n.id) && n.mainType === 'entity');
+    if (ns.length !== 2) { showToast('Chọn đúng 2 thực thể (Shift + nhấp)', 'warning'); return; }
+    const [a, b] = ns, cx = (a.x + a.w / 2 + b.x + b.w / 2) / 2, cy = (a.y + a.h / 2 + b.y + b.h / 2) / 2;
+    const r = { id: 'node_' + Date.now() + '_r', mode: 'erd', mainType: 'relationship', subType: 'normal', x: Math.round((cx - 50) / 10) * 10, y: Math.round((cy - 35) / 10) * 10,
+        w: 100, h: 70, label: 'Moi_Quan_He', fillColor: '#ffffff', borderColor: getDefaultBorderColor('relationship'), textColor: '#1e293b', columns: [] };
+    state.nodes.push(r);
+    [[a, '1'], [b, 'N']].forEach(([e, card], i) => state.connections.push({ id: 'conn_' + Date.now() + '_' + i, mode: 'erd', sourceId: e.id, targetId: r.id,
+        routing: 'straight', dashStyle: 'solid', strokeColor: '#3b82f6', strokeWidth: 2, cardinality: card, markerStart: 'none', markerEnd: 'none' }));
+    selectNode(r.id); saveHistory(); render();
+    setTimeout(() => openInlineTextEditor(r), 0);
+}
+function swapConn(id) {
+    const c = state.connections.find(k => k.id === id); if (!c) return;
+    [c.sourceId, c.targetId] = [c.targetId, c.sourceId];
+    [c.markerStart, c.markerEnd] = [c.markerEnd, c.markerStart];
+    [c.srcCol, c.tgtCol] = [c.tgtCol, c.srcCol];
+    if (c.subsetEnd === 'source') c.subsetEnd = 'target'; else if (c.subsetEnd === 'target') c.subsetEnd = 'source';
+    saveHistory(); render();
+}
+function fitView() {
+    const ns = state.nodes.filter(n => n.mode === state.mode); if (!ns.length) { resetZoom(); return; }
+    const minX = Math.min(...ns.map(n => n.x)), maxX = Math.max(...ns.map(n => n.x + n.w)), minY = Math.min(...ns.map(n => n.y)), maxY = Math.max(...ns.map(n => n.y + n.h));
+    const r = container.getBoundingClientRect(), pad = 60;
+    const z = Math.min(2, Math.max(0.3, Math.min((r.width - pad * 2) / (maxX - minX), (r.height - pad * 2) / (maxY - minY))));
+    state.zoom = z;
+    state.pan.x = (r.width - (maxX - minX) * z) / 2 - minX * z;
+    state.pan.y = (r.height - (maxY - minY) * z) / 2 - minY * z;
+    updateViewportTransform();
+}
         // ===== HELPERS =====
         const MARKERS = [['none', 'Không'], ['arrow', '▶ Đặc'], ['open', '› Mở'], ['tri_open', '△ Rỗng'], ['diamond', '◆ Thoi'], ['diamond_open', '◇ Thoi rỗng'], ['circle', '● Tròn'], ['circle_open', '○ Tròn rỗng'], ['bar', '| Một'], ['one', '‖ Đúng một'], ['many', '⋔ Nhiều'], ['one_many', '|⋔ Một-nhiều'], ['zero_one', '○| 0..1'], ['zero_many', '○⋔ 0..N']];
         function getConnAnchors(conn, s, t) {
